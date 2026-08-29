@@ -178,11 +178,8 @@ struct WakeUpView: View {
                 Spacer()
 
                 VStack(spacing: 14) {
-                    HStack(spacing: 12) {
-                        PrimaryButton(title: "Aller prendre un café") {
-                            model.go(to: .coffeeBreak)
-                        }
-                        MicButton(size: 62) { model.isListening = true }
+                    PrimaryButton(title: "Aller prendre un café") {
+                        model.go(to: .coffeeBreak)
                     }
                     SecondaryLink(title: "Encore 10 minutes") {
                         model.go(to: .coffeeBreak)
@@ -215,18 +212,12 @@ struct CoffeeBreakView: View {
 
                 Spacer()
 
-                HStack {
-                    Color.clear.frame(width: 54, height: 54)
-                    Spacer()
-                    Text("Passer la pause")
-                        .font(.app(15, .semibold))
-                        .foregroundStyle(Palette.textMuted)
-                        .onTapGesture { model.go(to: .afterCoffee) }
-                    Spacer()
-                    MicButton { model.isListening = true }
-                }
-                .padding(.horizontal, 30)
-                .padding(.bottom, 8)
+                Text("Passer la pause")
+                    .font(.app(15, .semibold))
+                    .foregroundStyle(Palette.textMuted)
+                    .frame(maxWidth: .infinity)
+                    .onTapGesture { model.go(to: .afterCoffee) }
+                    .padding(.bottom, 8)
             }
             .contentShape(Rectangle())
             .onTapGesture { model.go(to: .afterCoffee) }
@@ -258,11 +249,8 @@ struct AfterCoffeeView: View {
 
                 Spacer()
 
-                HStack(spacing: 12) {
-                    PrimaryButton(title: "Voir lesquelles") {
-                        model.go(to: .twoThings)
-                    }
-                    MicButton(size: 62) { model.isListening = true }
+                PrimaryButton(title: "Voir lesquelles") {
+                    model.go(to: .twoThings)
                 }
             }
             .padding(.horizontal, 34)

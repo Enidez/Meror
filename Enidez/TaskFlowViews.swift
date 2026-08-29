@@ -41,15 +41,10 @@ struct TwoThingsView: View {
                 Spacer()
 
                 VStack(spacing: 14) {
-                    HStack(spacing: 12) {
-                        PrimaryButton(title: "Je les fais maintenant") {
-                            model.enterApp()
-                        }
-                        MicButton(size: 62) { model.isListening = true }
+                    PrimaryButton(title: "Je les fais maintenant") {
+                        model.enterApp()
                     }
-                    SecondaryLink(title: "Changer une des deux") {
-                        model.isListening = true
-                    }
+                    CaptureField(placeholder: "Changer une des deux — écris ou dicte")
                 }
                 .padding(.horizontal, 34)
                 .padding(.bottom, 20)
@@ -112,12 +107,9 @@ struct TodayView: View {
 
                 Spacer()
 
-                HStack {
-                    Spacer()
-                    MicButton { model.isListening = true }
-                }
-                .padding(.horizontal, 28)
-                .padding(.bottom, 12)
+                CaptureField(placeholder: "Écris ou dicte une chose à faire")
+                    .padding(.horizontal, 28)
+                    .padding(.bottom, 12)
             }
         }
     }
@@ -247,17 +239,11 @@ struct HyperfocusView: View {
 
                 Spacer()
 
-                HStack(spacing: 16) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Une pensée parasite ?")
-                            .font(.app(15, .bold))
-                            .foregroundStyle(Palette.textSecondary)
-                        Text("Dis-la-moi, je la garde.")
-                            .font(.app(14, .medium))
-                            .foregroundStyle(Palette.textTertiary)
-                    }
-                    Spacer()
-                    MicButton { model.isListening = true }
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Une pensée parasite ? Note-la, je la garde.")
+                        .font(.app(14, .medium))
+                        .foregroundStyle(Palette.textTertiary)
+                    CaptureField(placeholder: "Écris ou dicte la pensée")
                 }
                 .padding(.horizontal, 32)
                 .padding(.bottom, 12)

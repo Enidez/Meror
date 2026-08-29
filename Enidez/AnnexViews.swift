@@ -31,28 +31,18 @@ struct UpcomingView: View {
                 .padding(.horizontal, 28)
                 .padding(.top, 4)
 
-                dictationBar
+                CaptureField(placeholder: "« Jeudi, dentiste » — écris ou dicte")
+                    .padding(.horizontal, 28)
+                    .padding(.top, 14)
+                    .padding(.bottom, 12)
             }
         }
     }
 
     private var header: some View {
-        HStack(spacing: 14) {
+        HStack {
             Text("À venir").bigTitle(30).foregroundStyle(Palette.textPrimary)
             Spacer()
-            Button {
-                model.isListening = true
-            } label: {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(Palette.surface)
-                    .frame(width: 40, height: 40)
-                    .overlay(
-                        Image(systemName: "plus")
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundStyle(Palette.textTertiary)
-                    )
-            }
-            .buttonStyle(.plain)
         }
         .padding(.horizontal, 28)
         .padding(.top, 24)
@@ -133,16 +123,4 @@ struct UpcomingView: View {
         }
     }
 
-    private var dictationBar: some View {
-        HStack(spacing: 16) {
-            Text("« Jeudi, penser au dentiste » — dicte, je le place.")
-                .font(.app(15, .medium))
-                .foregroundStyle(Palette.textTertiary)
-            Spacer(minLength: 0)
-            MicButton { model.isListening = true }
-        }
-        .padding(.horizontal, 28)
-        .padding(.top, 14)
-        .padding(.bottom, 12)
-    }
 }

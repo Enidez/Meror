@@ -226,9 +226,15 @@ final class AppModel {
         life.lastMood = mood
     }
 
-    // MARK: - Voix
+    // MARK: - Saisie (écrite ou dictée)
 
-    /// Donne un sens à ce qui vient d'être dit, selon le contexte.
+    /// Porte d'entrée commune au clavier et à la voix : la phrase est
+    /// interprétée selon le contexte, exactement comme la dictée.
+    func capture(_ text: String) {
+        interpret(text)
+    }
+
+    /// Donne un sens à ce qui vient d'être dit ou écrit, selon le contexte.
     private func interpret(_ phrase: String) {
         let phrase = phrase.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !phrase.isEmpty else { return }

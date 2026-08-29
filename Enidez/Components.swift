@@ -136,6 +136,65 @@ struct BackButton: View {
     }
 }
 
+// MARK: - Saisie : écrire ou dicter
+
+/// Un endroit fixe pour donner quelque chose à l'assistant — au clavier ou
+/// à la voix. La voix reste là (icône micro), mais on n'y est jamais obligé.
+struct CaptureField: View {
+    var placeholder: String
+
+    @Environment(AppModel.self) private var model
+    @State private var text = ""
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        HStack(spacing: 10) {
+            TextField(placeholder, text: $text)
+                .font(.app(15, .medium))
+                .foregroundStyle(Palette.textPrimary)
+                .tint(Palette.accent)
+                .textInputAutocapitalization(.sentences)
+                .submitLabel(.done)
+                .focused($focused)
+                .onSubmit(send)
+
+            if text.trimmingCharacters(in: .whitespaces).isEmpty {
+                Button {
+                    focused = false
+                    model.isListening = true
+                } label: {
+                    Image(systemName: "mic.fill")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Palette.accent)
+                        .frame(width: 34, height: 34)
+                        .background(Palette.surface, in: Circle())
+                }
+                .buttonStyle(.plain)
+            } else {
+                Button(action: send) {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.system(size: 28))
+                        .foregroundStyle(Palette.accent)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.leading, 18)
+        .padding(.trailing, 8)
+        .frame(height: 54)
+        .background(Palette.surfaceRaised, in: Capsule())
+        .overlay(Capsule().stroke(Palette.hairline, lineWidth: 1))
+    }
+
+    private func send() {
+        let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        text = ""
+        focused = false
+        guard !value.isEmpty else { return }
+        model.capture(value)
+    }
+}
+
 // MARK: - Retour d'écoute du micro
 
 /// Voile d'écoute affiché quand l'assistant capte la voix.
