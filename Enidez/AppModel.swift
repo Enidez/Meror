@@ -17,7 +17,8 @@ import SwiftUI
 /// Les étapes du rituel du matin, puis `.app` une fois qu'on est entré.
 enum Screen: String, Codable {
     case welcome
-    case onboarding
+    case onboarding   // Ton prénom
+    case attune       // Trois questions pour te cerner
     case wakeUp
     case coffeeBreak
     case afterCoffee
@@ -38,6 +39,14 @@ struct Deadline: Identifiable, Codable {
     var day: String       // « MER 19 »
     var title: String
     var hasAccent: Bool = false
+
+    static var starter: [Deadline] {
+        [
+            Deadline(day: "MER 19", title: "Dossier mutuelle", hasAccent: true),
+            Deadline(day: "VEN 21", title: "Rendez-vous kiné"),
+            Deadline(day: "LUN 24", title: "Courses de la semaine")
+        ]
+    }
 }
 
 @MainActor
@@ -48,6 +57,11 @@ final class AppModel {
 
     /// Vrai une fois le prénom donné.
     var isOnboarded = false { didSet { persist() } }
+
+    /// Ce que la personne nous a dit d'elle au premier lancement.
+    var energyMoment: EnergyMoment? { didSet { persist() } }
+    var dailyStruggle: DailyStruggle? { didSet { persist() } }
+    var goodDay: GoodDay? { didSet { persist() } }
 
     /// Où l'on en est : une étape du rituel, ou `.app`.
     var screen: Screen = .welcome { didSet { persist() } }
@@ -81,11 +95,7 @@ final class AppModel {
     var items: [Item] = Item.starter { didSet { persist() } }
 
     /// Les échéances datées (onglet À venir).
-    var deadlines: [Deadline] = [
-        Deadline(day: "MER 19", title: "Dossier mutuelle", hasAccent: true),
-        Deadline(day: "VEN 21", title: "Rendez-vous kiné"),
-        Deadline(day: "LUN 24", title: "Courses de la semaine")
-    ] { didSet { persist() } }
+    var deadlines: [Deadline] = Deadline.starter { didSet { persist() } }
 
     /// Sélection en cours sur l'écran de tri (max 2).
     var triagePicks: [UUID] = []
@@ -135,6 +145,10 @@ final class AppModel {
 
         name = saved.name
         isOnboarded = saved.isOnboarded
+        energyMoment = saved.energyMoment
+        dailyStruggle = saved.dailyStruggle
+        goodDay = saved.goodDay
+        if let period = saved.energyMoment?.period { life.selfReportedPeriod = period }
         tab = saved.tab
         items = saved.items
         deadlines = saved.deadlines
@@ -152,7 +166,7 @@ final class AppModel {
         // Relancé en plein tri : on repropose deux choses (la sélection en
         // cours n'est pas sauvegardée, c'est un choix du moment).
         if screen == .triage {
-            triagePicks = Planner.suggestions(from: items).map(\.item.id)
+            triagePicks = Planner.suggestions(from: items, struggle: dailyStruggle).map(\.item.id)
         }
     }
 
@@ -161,6 +175,9 @@ final class AppModel {
         Store.save(StoredState(
             name: name,
             isOnboarded: isOnboarded,
+            energyMoment: energyMoment,
+            dailyStruggle: dailyStruggle,
+            goodDay: goodDay,
             screen: screen,
             tab: tab,
             items: items,
@@ -177,8 +194,38 @@ final class AppModel {
     func completeOnboarding(name raw: String) {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmed.isEmpty { name = trimmed }
+        go(to: .attune)
+    }
+
+    /// Range les trois réponses et termine le premier lancement.
+    func completeAttune(energy: EnergyMoment, struggle: DailyStruggle, goodDay: GoodDay) {
+        energyMoment = energy
+        dailyStruggle = struggle
+        self.goodDay = goodDay
+        life.selfReportedPeriod = energy.period
         isOnboarded = true
         go(to: .wakeUp)
+    }
+
+    // MARK: - Démo
+
+    /// Bouton provisoire : efface tout et repart de l'écran d'accueil.
+    func resetAll() {
+        Store.clear()
+        name = "Léa"
+        isOnboarded = false
+        energyMoment = nil
+        dailyStruggle = nil
+        goodDay = nil
+        tab = .today
+        inFocus = false
+        isListening = false
+        life = .sample
+        capturedThoughts = []
+        items = Item.starter
+        deadlines = Deadline.starter
+        triagePicks = []
+        withAnimation(.easeInOut(duration: 0.4)) { screen = .welcome }
     }
 
     // MARK: - Navigation
@@ -205,13 +252,13 @@ final class AppModel {
 
     /// Ouvre l'écran de tri, pré-rempli des deux suggestions.
     func startTriage() {
-        triagePicks = Planner.suggestions(from: items).map(\.item.id)
+        triagePicks = Planner.suggestions(from: items, struggle: dailyStruggle).map(\.item.id)
         go(to: .triage)
     }
 
     /// La raison affichée sous une suggestion, s'il y en a une.
     func triageReason(for id: UUID) -> String? {
-        Planner.suggestions(from: items).first { $0.item.id == id }?.reason
+        Planner.suggestions(from: items, struggle: dailyStruggle).first { $0.item.id == id }?.reason
     }
 
     /// Coche / décoche une chose pour aujourd'hui (deux au maximum).
@@ -225,7 +272,7 @@ final class AppModel {
 
     /// Fige la sélection du jour et entre dans l'app.
     func confirmTriage() {
-        let suggested = Set(Planner.suggestions(from: items).map(\.item.id))
+        let suggested = Set(Planner.suggestions(from: items, struggle: dailyStruggle).map(\.item.id))
         let now = Date()
         for index in items.indices where items[index].isOpen {
             let id = items[index].id

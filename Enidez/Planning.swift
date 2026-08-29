@@ -9,6 +9,47 @@
 
 import Foundation
 
+// MARK: - Ce que la personne nous dit d'elle au premier lancement
+
+/// Le moment où elle tient le mieux.
+enum EnergyMoment: String, Codable, CaseIterable, Identifiable {
+    case morning = "Le matin"
+    case afternoon = "L'après-midi"
+    case evening = "Le soir"
+    case itVaries = "Ça change tout le temps"
+
+    var id: String { rawValue }
+
+    var period: FocusPeriod? {
+        switch self {
+        case .morning:   .morning
+        case .afternoon: .afternoon
+        case .evening:   .evening
+        case .itVaries:  nil
+        }
+    }
+}
+
+/// Ce qui lui complique le plus les journées.
+enum DailyStruggle: String, Codable, CaseIterable, Identifiable {
+    case scattered = "Je me disperse, je perds le fil"
+    case postpone  = "Je repousse, et après ça m'angoisse"
+    case overload  = "J'en demande trop, je m'épuise"
+    case starting  = "Le plus dur, c'est de commencer"
+
+    var id: String { rawValue }
+}
+
+/// Ce qui, pour elle, fait qu'une journée est bonne.
+enum GoodDay: String, Codable, CaseIterable, Identifiable {
+    case progress = "Avoir avancé sur l'essentiel"
+    case present  = "M'être senti·e posé·e, pas dispersé·e"
+    case selfCare = "Avoir pris soin de moi"
+    case kept     = "Avoir tenu ce que j'avais prévu"
+
+    var id: String { rawValue }
+}
+
 /// Une chose à faire. Peut être estimée, datée, faite, ou choisie pour un jour.
 struct Item: Identifiable, Codable {
     var id = UUID()
@@ -59,10 +100,13 @@ enum Planner {
     }
 
     /// Les deux meilleures candidates parmi le backlog ouvert non choisi.
-    static func suggestions(from items: [Item], on day: Date = Date()) -> [Suggestion] {
+    /// `struggle` incline légèrement le tri vers ce qui aide cette personne.
+    static func suggestions(from items: [Item],
+                            struggle: DailyStruggle? = nil,
+                            on day: Date = Date()) -> [Suggestion] {
         let pool = items.filter { $0.isOpen && !$0.isPickedToday }
         let ranked = pool
-            .map { (item: $0, score: score($0, on: day)) }
+            .map { (item: $0, score: score($0, struggle: struggle, on: day)) }
             .sorted { $0.score > $1.score }
             .prefix(2)
         return ranked.map { Suggestion(item: $0.item, reason: reason(for: $0.item, on: day)) }
@@ -70,7 +114,7 @@ enum Planner {
 
     // MARK: - Score
 
-    private static func score(_ item: Item, on day: Date) -> Double {
+    private static func score(_ item: Item, struggle: DailyStruggle?, on day: Date) -> Double {
         var s = 0.0
         let cal = Calendar.current
 
@@ -87,15 +131,18 @@ enum Planner {
         }
 
         // Reportée à la main : on la fait réémerger, sans harceler.
-        s += Double(min(item.deferrals, 4)) * 6
+        let deferWeight = (struggle == .postpone) ? 12.0 : 6.0
+        s += Double(min(item.deferrals, 4)) * deferWeight
 
         // Continuité : commencée un autre jour mais pas finie.
         if let picked = item.pickedOn, !cal.isDateInToday(picked) {
             s += 12
         }
 
-        // Petites tâches : un léger coup de pouce (une victoire rapide).
-        if let m = item.minutes, m <= 10 { s += 4 }
+        // Petites tâches : une victoire rapide. Plus fort si démarrer est dur.
+        if let m = item.minutes, m <= 10 {
+            s += (struggle == .starting) ? 14 : 4
+        }
 
         return s
     }

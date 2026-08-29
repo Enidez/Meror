@@ -16,6 +16,9 @@ import Foundation
 struct StoredState: Codable {
     var name: String
     var isOnboarded: Bool
+    var energyMoment: EnergyMoment?
+    var dailyStruggle: DailyStruggle?
+    var goodDay: GoodDay?
     var screen: Screen
     var tab: AppTab
     var items: [Item]

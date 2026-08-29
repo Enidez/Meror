@@ -54,6 +54,8 @@ struct LifeContext {
 
     // Rythme de focus
     var bestFocusPeriod: FocusPeriod = .morning
+    /// Le moment déclaré au premier lancement, avant qu'on ait pu l'observer.
+    var selfReportedPeriod: FocusPeriod?
     var focusStreakDays: Int = 0
     var focusHoursThisWeek: Double = 0
     var thingsClosedThisWeek: Int = 0
@@ -121,9 +123,14 @@ enum AdviceEngine {
     /// Observation d'ouverture de l'onglet « Toi », en deux tons. La seconde
     /// phrase n'apparaît que si on a vraiment observé un rythme.
     static func observation(_ c: LifeContext) -> (lead: String, tail: String) {
-        let tail = c.focusStreakDays > 0
-            ? "Tes \(c.bestFocusPeriod.label) te réussissent mieux que \(c.bestFocusPeriod.complement)."
-            : ""
+        let tail: String
+        if c.focusStreakDays > 0 {
+            tail = "Tes \(c.bestFocusPeriod.label) te réussissent mieux que \(c.bestFocusPeriod.complement)."
+        } else if let p = c.selfReportedPeriod {
+            tail = "Tu m'as dit tenir mieux \(p.label). J'en tiens compte."
+        } else {
+            tail = ""
+        }
         if c.lastMood == .low {
             return ("Aujourd'hui pèse un peu plus, et c'est ok.", tail)
         }

@@ -44,6 +44,7 @@ struct ContentView: View {
         switch model.screen {
         case .welcome:     WelcomeView()
         case .onboarding:  OnboardingView()
+        case .attune:      AttuneView()
         case .wakeUp:      WakeUpView()
         case .coffeeBreak: CoffeeBreakView()
         case .afterCoffee: AfterCoffeeView()

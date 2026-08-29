@@ -152,6 +152,126 @@ struct OnboardingView: View {
     }
 }
 
+// MARK: - Premier lancement · Trois questions pour te cerner
+
+struct AttuneView: View {
+    @Environment(AppModel.self) private var model
+
+    @State private var step = 0
+    @State private var energy: EnergyMoment?
+    @State private var struggle: DailyStruggle?
+    @State private var good: GoodDay?
+
+    var body: some View {
+        PhoneScreen(time: "9:41", trailing: "v1") {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 7) {
+                    ForEach(0..<3, id: \.self) { i in
+                        Capsule()
+                            .fill(i <= step ? Palette.accent : Color.white.opacity(0.12))
+                            .frame(width: i == step ? 24 : 7, height: 4)
+                    }
+                }
+                .padding(.top, 32)
+                .animation(.easeInOut(duration: 0.2), value: step)
+
+                Spacer()
+
+                question
+                    .id(step)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                        removal: .move(edge: .leading).combined(with: .opacity)))
+
+                Spacer()
+            }
+            .padding(.horizontal, 34)
+            .padding(.bottom, 24)
+        }
+    }
+
+    @ViewBuilder
+    private var question: some View {
+        switch step {
+        case 0:
+            block(lead: "À quel moment tu\n", tail: "tiens le mieux ?",
+                  hint: "Ton énergie, ta tête claire.") {
+                ForEach(EnergyMoment.allCases) { option in
+                    choice(option.rawValue, selected: energy == option) {
+                        energy = option; advance()
+                    }
+                }
+            }
+        case 1:
+            block(lead: "Qu'est-ce qui te\n", tail: "complique les journées ?",
+                  hint: "Sans jugement. Juste pour t'aider comme il faut.") {
+                ForEach(DailyStruggle.allCases) { option in
+                    choice(option.rawValue, selected: struggle == option) {
+                        struggle = option; advance()
+                    }
+                }
+            }
+        default:
+            block(lead: "Une bonne journée\n", tail: "pour toi, c'est…",
+                  hint: "Ce qui te laisse le cœur léger, le soir.") {
+                ForEach(GoodDay.allCases) { option in
+                    choice(option.rawValue, selected: good == option) {
+                        good = option; finish()
+                    }
+                }
+            }
+        }
+    }
+
+    private func block<Options: View>(lead: String, tail: String, hint: String,
+                                      @ViewBuilder options: () -> Options) -> some View {
+        VStack(alignment: .leading, spacing: 22) {
+            Circle().fill(Palette.accent).frame(width: 8, height: 8)
+
+            (Text(lead) + Text(tail).foregroundColor(Palette.textSecondary))
+                .bigTitle(32)
+                .foregroundStyle(Palette.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(hint)
+                .font(.app(15, .medium))
+                .foregroundStyle(Palette.textTertiary)
+                .lineSpacing(4)
+
+            VStack(spacing: 10) {
+                options()
+            }
+            .padding(.top, 6)
+        }
+    }
+
+    private func choice(_ label: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack {
+                Text(label)
+                    .font(.app(16, .semibold))
+                    .foregroundStyle(selected ? .black : Palette.textSecondary)
+                    .multilineTextAlignment(.leading)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+            .background(selected ? Palette.accent : Color.white.opacity(0.05),
+                        in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func advance() {
+        withAnimation(.easeInOut(duration: 0.25)) { step += 1 }
+    }
+
+    private func finish() {
+        guard let energy, let struggle, let good else { return }
+        model.completeAttune(energy: energy, struggle: struggle, goodDay: good)
+    }
+}
+
 // MARK: - 3a · Le réveil
 
 struct WakeUpView: View {

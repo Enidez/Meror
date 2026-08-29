@@ -24,6 +24,7 @@ struct YouView: View {
                     VStack(alignment: .leading, spacing: 18) {
                         observation
                             .padding(.bottom, 4)
+                        toldSection
                         moodSection
                         sleepSection
                         activitySection
@@ -36,6 +37,7 @@ struct YouView: View {
                             .font(.app(14, .medium))
                             .foregroundStyle(Palette.textMuted)
                             .padding(.top, 2)
+                        resetButton
                     }
                     .padding(.horizontal, 28)
                     .padding(.bottom, 24)
@@ -67,6 +69,56 @@ struct YouView: View {
             .foregroundStyle(Color(hex: 0xD6D6D9))
             .lineSpacing(6)
             .fixedSize(horizontal: false, vertical: true)
+    }
+
+    // MARK: - Ce que tu m'as dit
+
+    @ViewBuilder
+    private var toldSection: some View {
+        if model.energyMoment != nil || model.dailyStruggle != nil || model.goodDay != nil {
+            Card {
+                Text("CE QUE TU M'AS DIT").sectionLabel()
+                if let e = model.energyMoment {
+                    told("Tu tiens le mieux", e.rawValue.lowercased())
+                }
+                if let s = model.dailyStruggle {
+                    told("Ce qui te pèse", s.rawValue.lowercased())
+                }
+                if let g = model.goodDay {
+                    told("Une bonne journée", g.rawValue.lowercased())
+                }
+            }
+        }
+    }
+
+    private func told(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(label)
+                .font(.app(13, .medium))
+                .foregroundStyle(Palette.textTertiary)
+            Text(value)
+                .font(.app(16, .semibold))
+                .foregroundStyle(Color(hex: 0xD6D6D9))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    // MARK: - Réinitialiser (provisoire, pour les démos)
+
+    private var resetButton: some View {
+        HStack {
+            Spacer()
+            Button(role: .destructive) {
+                model.resetAll()
+            } label: {
+                Text("Réinitialiser (démo)")
+                    .font(.app(13, .medium))
+                    .foregroundStyle(Palette.textGhost)
+            }
+            .buttonStyle(.plain)
+            Spacer()
+        }
+        .padding(.top, 24)
     }
 
     // MARK: - Humeur
