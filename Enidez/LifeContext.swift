@@ -90,6 +90,14 @@ struct LifeContext {
     )
 }
 
+/// Le mot du jour quand tout est fait : un label discret, une phrase, et
+/// parfois l'auteur d'un livre.
+struct RestingNote {
+    var label: String?
+    var text: String
+    var footnote: String?
+}
+
 /// Traduit les paramètres de vie en phrases : le ton est neutre et efficace,
 /// mais bienveillant. Jamais de score, jamais de reproche.
 enum AdviceEngine {
@@ -140,6 +148,41 @@ enum AdviceEngine {
     /// La ligne de chiffres, reléguée en fin d'écran, en petit.
     static func summaryLine(_ c: LifeContext) -> String {
         "\(hours(c.focusHoursThisWeek)) de focus cette semaine · \(c.thingsClosedThisWeek) choses closes"
+    }
+
+    /// Ce qu'on montre quand la journée est faite : une phrase pour toi, une
+    /// petite idée, ou un livre — choisi selon le moment, stable pour la
+    /// journée (rien qui bouge, rien d'aléatoire à l'écran).
+    static func restingNote(_ c: LifeContext, on date: Date = Date()) -> RestingNote {
+        if c.lastMood == .low {
+            return RestingNote(
+                label: "POUR TOI",
+                text: "Journée plus lourde. Tu n'as pas à la remplir. T'être arrêtée ici, c'est déjà quelque chose.")
+        }
+        if c.focusStreakDays >= 10 {
+            return RestingNote(
+                label: "POUR TOI",
+                text: "\(c.focusStreakDays) jours que tu tiens ton rythme. Ça ne se voit pas de l'extérieur, mais c'est rare. Savoure-le.")
+        }
+
+        let pool: [RestingNote] = [
+            RestingNote(label: "UNE IDÉE",
+                        text: "Sors marcher dix minutes, sans téléphone. Ton corps a fait sa part, offre-lui de l'air."),
+            RestingNote(label: "UN LIVRE",
+                        text: "« Méditer, jour après jour »", footnote: "Christophe André"),
+            RestingNote(label: "UNE IDÉE",
+                        text: "Écris à quelqu'un à qui tu penses depuis un moment. Deux lignes suffisent."),
+            RestingNote(label: "UN LIVRE",
+                        text: "« Un petit pas peut changer votre vie »", footnote: "Robert Maurer"),
+            RestingNote(label: nil,
+                        text: "Ce que tu fais en ce moment te réussit. Garde ce rythme, sans forcer."),
+            RestingNote(label: "UNE IDÉE",
+                        text: "Range une seule chose qui traîne. Une. Puis laisse le reste tranquille."),
+            RestingNote(label: "UN LIVRE",
+                        text: "« L'éloge de la lenteur »", footnote: "Carl Honoré"),
+        ]
+        let day = Calendar.current.ordinality(of: .day, in: .year, for: date) ?? 0
+        return pool[day % pool.count]
     }
 
     // MARK: - Mise en forme

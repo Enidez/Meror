@@ -118,11 +118,7 @@ struct TodayView: View {
                             .foregroundStyle(Palette.textMuted)
                             .padding(.top, 4)
                     } else {
-                        Text("Tout est fait. Le reste du jour t'appartient.")
-                            .font(.app(20, .bold))
-                            .foregroundStyle(Palette.textSecondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 20)
+                        restingNote(AdviceEngine.restingNote(model.life))
                     }
                 }
                 .padding(.horizontal, 28)
@@ -156,6 +152,31 @@ struct TodayView: View {
                 .padding(.bottom, 12)
             }
         }
+    }
+
+    /// Affiché quand tout est fait : le mot du jour, calme et fixe.
+    private func restingNote(_ note: RestingNote) -> some View {
+        VStack(spacing: 16) {
+            if let label = note.label {
+                Text(label)
+                    .font(.app(12, .bold))
+                    .tracking(2)
+                    .foregroundStyle(Palette.textGhost)
+            }
+            Text(note.text)
+                .font(.app(22, .bold))
+                .tracking(-0.4)
+                .foregroundStyle(Palette.textSecondary)
+                .multilineTextAlignment(.center)
+                .lineSpacing(6)
+                .fixedSize(horizontal: false, vertical: true)
+            if let footnote = note.footnote {
+                Text(footnote)
+                    .font(.app(14, .medium))
+                    .foregroundStyle(Palette.textTertiary)
+            }
+        }
+        .padding(.horizontal, 20)
     }
 
     private func currentCard(_ task: DayTask) -> some View {
