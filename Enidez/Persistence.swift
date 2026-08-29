@@ -17,6 +17,7 @@ struct StoredState: Codable {
     var name: String
     var isOnboarded: Bool
     var screen: Screen
+    var tab: AppTab
     var tasks: [DayTask]
     var deadlines: [Deadline]
     var capturedThoughts: [String]
@@ -26,7 +27,7 @@ struct StoredState: Codable {
 }
 
 enum Store {
-    private static let key = "enidez.state.v3"
+    private static let key = "enidez.state.v4"
 
     /// Relit l'état sauvegardé, ou `nil` s'il n'y en a pas (ou s'il est illisible).
     static func load() -> StoredState? {

@@ -2,8 +2,8 @@
 //  ContentView.swift
 //  Enidez
 //
-//  Hôte du parcours « Un jour ». Affiche une seule chose à la fois,
-//  avec le voile d'écoute du micro par-dessus quand l'assistant écoute.
+//  Racine de l'app. Deux temps : le rituel du matin (plein écran), puis les
+//  trois onglets. Le voile d'écoute du micro passe par-dessus tout.
 //
 
 import SwiftUI
@@ -15,10 +15,9 @@ struct ContentView: View {
         ZStack {
             Palette.screen.ignoresSafeArea()
 
-            currentScreen
+            phase
                 .environment(model)
                 .transition(.opacity)
-                .id(screenID)
 
             if model.isListening {
                 ListeningOverlay(name: model.name,
@@ -36,13 +35,12 @@ struct ContentView: View {
         .persistentSystemOverlays(.hidden)
         #endif
         .task {
-            // Charge le sommeil et l'activité depuis Apple Santé au lancement.
             await model.loadHealthData()
         }
     }
 
     @ViewBuilder
-    private var currentScreen: some View {
+    private var phase: some View {
         switch model.screen {
         case .welcome:     WelcomeView()
         case .onboarding:  OnboardingView()
@@ -50,28 +48,35 @@ struct ContentView: View {
         case .coffeeBreak: CoffeeBreakView()
         case .afterCoffee: AfterCoffeeView()
         case .twoThings:   TwoThingsView()
-        case .today:       TodayView()
-        case .hyperfocus:  HyperfocusView()
-        case .upcoming:    UpcomingView()
-        case .evolution:   EvolutionView()
-        case .profile:     ProfileView()
+        case .app:         AppTabs()
         }
     }
+}
 
-    /// Force un fondu propre entre écrans.
-    private var screenID: Int {
-        switch model.screen {
-        case .welcome: 0
-        case .onboarding: 10
-        case .wakeUp: 1
-        case .coffeeBreak: 2
-        case .afterCoffee: 3
-        case .twoThings: 4
-        case .today: 5
-        case .hyperfocus: 6
-        case .upcoming: 7
-        case .evolution: 8
-        case .profile: 9
+/// Les trois onglets. Le minuteur de focus s'ouvre par-dessus, sans la barre.
+struct AppTabs: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        @Bindable var model = model
+
+        TabView(selection: $model.tab) {
+            TodayView()
+                .tag(AppTab.today)
+                .tabItem { Label("Aujourd'hui", systemImage: "sun.max") }
+
+            UpcomingView()
+                .tag(AppTab.upcoming)
+                .tabItem { Label("À venir", systemImage: "calendar") }
+
+            YouView()
+                .tag(AppTab.you)
+                .tabItem { Label("Toi", systemImage: "person") }
+        }
+        .tint(Palette.accent)
+        .fullScreenCover(isPresented: $model.inFocus) {
+            HyperfocusView()
+                .environment(model)
         }
     }
 }

@@ -2,13 +2,12 @@
 //  AnnexViews.swift
 //  Enidez
 //
-//  Écrans secondaires : les jours à venir et « Ton évolution ».
-//  Non frontaux : pas de barres, pas de podium, une observation bienveillante.
+//  L'onglet « À venir » : le calendrier du mois et les échéances.
 //
 
 import SwiftUI
 
-// MARK: - 3f · Les jours à venir
+// MARK: - Onglet · À venir
 
 struct UpcomingView: View {
     @Environment(AppModel.self) private var model
@@ -39,7 +38,6 @@ struct UpcomingView: View {
 
     private var header: some View {
         HStack(spacing: 14) {
-            BackButton { model.go(to: .today) }
             Text("À venir").bigTitle(30).foregroundStyle(Palette.textPrimary)
             Spacer()
             Button {
@@ -146,160 +144,5 @@ struct UpcomingView: View {
         .padding(.horizontal, 28)
         .padding(.top, 14)
         .padding(.bottom, 12)
-    }
-}
-
-// MARK: - 3h · Ton évolution
-
-struct EvolutionView: View {
-    @Environment(AppModel.self) private var model
-
-    /// Points d'activité d'un mois, reproduits du semis pseudo-aléatoire du design.
-    private func seedDots(count: Int, density: Double, seed: Double) -> [Double] {
-        (0..<count).map { i in
-            let raw = sin(Double(i) * 12.9898 + seed) * 43758.5453
-            let v = abs(raw.truncatingRemainder(dividingBy: 1))
-            if v < density { return v < density * 0.35 ? 0.75 : 0.4 }
-            return 0.1
-        }
-    }
-
-    private var months: [(label: String, dots: [Double])] {
-        [
-            ("Juin", seedDots(count: 28, density: 0.5, seed: 3)),
-            ("Juil", seedDots(count: 28, density: 0.68, seed: 9)),
-            ("Août", seedDots(count: 28, density: 0.6, seed: 17))
-        ]
-    }
-
-    var body: some View {
-        PhoneScreen(time: "21:40", trailing: "août") {
-            VStack(alignment: .leading, spacing: 0) {
-                HStack {
-                    BackButton { model.go(to: .today) }
-                    Spacer()
-                    Button {
-                        model.go(to: .profile)
-                    } label: {
-                        RoundedRectangle(cornerRadius: 22, style: .continuous)
-                            .fill(Palette.surface)
-                            .frame(width: 44, height: 44)
-                            .overlay(
-                                Image(systemName: "person")
-                                    .font(.system(size: 16, weight: .medium))
-                                    .foregroundStyle(Palette.textMuted)
-                            )
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding(.horizontal, 28)
-                .padding(.top, 22)
-
-                Text("Ton évolution")
-                    .bigTitle(30)
-                    .foregroundStyle(Palette.textPrimary)
-                    .padding(.horizontal, 28)
-                    .padding(.top, 18)
-
-                Spacer()
-
-                VStack(alignment: .leading, spacing: 26) {
-                    observation
-                    threeMonths
-                    adviceCard
-                    Text(AdviceEngine.summaryLine(model.life))
-                        .font(.app(15, .medium))
-                        .foregroundStyle(Palette.textMuted)
-                }
-                .padding(.horizontal, 28)
-
-                Spacer()
-
-                HStack(spacing: 16) {
-                    Text("« Pourquoi j'ai décroché hier ? » — demande-moi.")
-                        .font(.app(15, .medium))
-                        .foregroundStyle(Palette.textTertiary)
-                    Spacer(minLength: 0)
-                    MicButton { model.isListening = true }
-                }
-                .padding(.horizontal, 28)
-                .padding(.bottom, 12)
-            }
-        }
-    }
-
-    private var observation: some View {
-        let parts = AdviceEngine.observation(model.life)
-        return (Text(parts.lead + " ")
-            + Text(parts.tail).foregroundColor(Palette.textTertiary))
-            .font(.app(24, .bold))
-            .tracking(-0.5)
-            .foregroundStyle(Color(hex: 0xD6D6D9))
-            .lineSpacing(6)
-            .fixedSize(horizontal: false, vertical: true)
-    }
-
-    private var threeMonths: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("TROIS DERNIERS MOIS")
-                .font(.app(12, .bold))
-                .tracking(2)
-                .foregroundStyle(Palette.textGhost)
-            HStack(alignment: .top, spacing: 16) {
-                ForEach(months, id: \.label) { month in
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text(month.label)
-                            .font(.app(13, .semibold))
-                            .foregroundStyle(Palette.textTertiary)
-                        LazyVGrid(columns: Array(repeating: GridItem(.fixed(5), spacing: 5), count: 7), spacing: 5) {
-                            ForEach(Array(month.dots.enumerated()), id: \.offset) { _, opacity in
-                                Circle()
-                                    .fill(Color.white.opacity(opacity))
-                                    .frame(width: 5, height: 5)
-                            }
-                        }
-                        .fixedSize()
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
-        }
-    }
-
-    private var adviceCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("CE QUE JE TE PROPOSE")
-                .font(.app(12, .bold))
-                .tracking(2)
-                .foregroundStyle(Palette.textGhost)
-            Text(AdviceEngine.advice(model.life))
-                .font(.app(18, .semibold))
-                .foregroundStyle(Color(hex: 0xD6D6D9))
-                .lineSpacing(5)
-                .fixedSize(horizontal: false, vertical: true)
-            HStack(spacing: 10) {
-                Button { model.go(to: .today) } label: {
-                    Text("On essaie")
-                        .font(.app(15, .bold))
-                        .foregroundStyle(.black)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 48)
-                        .background(Color.white.opacity(0.9), in: Capsule())
-                }
-                .buttonStyle(.plain)
-                Button { model.go(to: .today) } label: {
-                    Text("Pas cette fois")
-                        .font(.app(15, .semibold))
-                        .foregroundStyle(Palette.textMuted)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 48)
-                        .background(Color.white.opacity(0.05), in: Capsule())
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.top, 6)
-        }
-        .padding(22)
-        .background(Palette.surface, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
     }
 }

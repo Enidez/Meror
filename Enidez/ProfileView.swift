@@ -2,14 +2,15 @@
 //  ProfileView.swift
 //  Enidez
 //
-//  Le petit profil : ce que l'assistant sait de toi, sans jamais te noter.
-//  Sommeil et activité viennent d'Apple Santé ; l'humeur et l'objectif de
-//  coucher se règlent ici, en un geste ou à la voix.
+//  L'onglet « Toi » : ce que l'assistant sait de toi, et comment tu évolues.
+//  Une observation bienveillante en ouverture, puis l'humeur, le sommeil,
+//  l'activité, le rythme, les trois derniers mois, un conseil, l'objectif de
+//  coucher. Jamais de score, jamais de reproche.
 //
 
 import SwiftUI
 
-struct ProfileView: View {
+struct YouView: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
@@ -21,12 +22,20 @@ struct ProfileView: View {
 
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 18) {
+                        observation
+                            .padding(.bottom, 4)
                         moodSection
                         sleepSection
                         activitySection
                         focusSection
+                        threeMonths
+                        adviceCard
                         bedtimeSection($model.life.targetBedtime)
                         connectionNote
+                        Text(AdviceEngine.summaryLine(model.life))
+                            .font(.app(14, .medium))
+                            .foregroundStyle(Palette.textMuted)
+                            .padding(.top, 2)
                     }
                     .padding(.horizontal, 28)
                     .padding(.bottom, 24)
@@ -39,23 +48,32 @@ struct ProfileView: View {
 
     private var header: some View {
         HStack {
-            BackButton { model.go(to: .today) }
+            Text("Toi").bigTitle(30).foregroundStyle(Palette.textPrimary)
             Spacer()
         }
-        .overlay(
-            Text("Toi").bigTitle(30).foregroundStyle(Palette.textPrimary)
-        )
         .padding(.horizontal, 28)
         .padding(.top, 22)
-        .padding(.bottom, 20)
+        .padding(.bottom, 18)
+    }
+
+    // MARK: - Observation d'ouverture
+
+    private var observation: some View {
+        let parts = AdviceEngine.observation(model.life)
+        return (Text(parts.lead + " ")
+            + Text(parts.tail).foregroundColor(Palette.textTertiary))
+            .font(.app(22, .bold))
+            .tracking(-0.4)
+            .foregroundStyle(Color(hex: 0xD6D6D9))
+            .lineSpacing(6)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     // MARK: - Humeur
 
     private var moodSection: some View {
         Card {
-            Text("COMMENT TU TE SENS")
-                .sectionLabel()
+            Text("COMMENT TU TE SENS").sectionLabel()
             HStack(spacing: 10) {
                 ForEach(Mood.allCases) { mood in
                     moodChip(mood)
@@ -109,6 +127,62 @@ struct ProfileView: View {
             Text("TON RYTHME").sectionLabel()
             metric("Meilleur moment", value: model.life.bestFocusPeriod.label)
             metric("Régularité", value: "\(model.life.focusStreakDays) jours")
+        }
+    }
+
+    // MARK: - Trois derniers mois
+
+    private func seedDots(count: Int, density: Double, seed: Double) -> [Double] {
+        (0..<count).map { i in
+            let raw = sin(Double(i) * 12.9898 + seed) * 43758.5453
+            let v = abs(raw.truncatingRemainder(dividingBy: 1))
+            if v < density { return v < density * 0.35 ? 0.75 : 0.4 }
+            return 0.1
+        }
+    }
+
+    private var months: [(label: String, dots: [Double])] {
+        [
+            ("Juin", seedDots(count: 28, density: 0.5, seed: 3)),
+            ("Juil", seedDots(count: 28, density: 0.68, seed: 9)),
+            ("Août", seedDots(count: 28, density: 0.6, seed: 17))
+        ]
+    }
+
+    private var threeMonths: some View {
+        Card {
+            Text("TROIS DERNIERS MOIS").sectionLabel()
+            HStack(alignment: .top, spacing: 16) {
+                ForEach(months, id: \.label) { month in
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(month.label)
+                            .font(.app(13, .semibold))
+                            .foregroundStyle(Palette.textTertiary)
+                        LazyVGrid(columns: Array(repeating: GridItem(.fixed(5), spacing: 5), count: 7), spacing: 5) {
+                            ForEach(Array(month.dots.enumerated()), id: \.offset) { _, opacity in
+                                Circle()
+                                    .fill(Color.white.opacity(opacity))
+                                    .frame(width: 5, height: 5)
+                            }
+                        }
+                        .fixedSize()
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+    }
+
+    // MARK: - Conseil
+
+    private var adviceCard: some View {
+        Card {
+            Text("CE QUE JE TE PROPOSE").sectionLabel()
+            Text(AdviceEngine.advice(model.life))
+                .font(.app(17, .semibold))
+                .foregroundStyle(Color(hex: 0xD6D6D9))
+                .lineSpacing(5)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

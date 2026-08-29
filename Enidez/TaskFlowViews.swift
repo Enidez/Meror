@@ -43,7 +43,7 @@ struct TwoThingsView: View {
                 VStack(spacing: 14) {
                     HStack(spacing: 12) {
                         PrimaryButton(title: "Je les fais maintenant") {
-                            model.go(to: .today)
+                            model.enterApp()
                         }
                         MicButton(size: 62) { model.isListening = true }
                     }
@@ -88,19 +88,6 @@ struct TodayView: View {
                 HStack {
                     Text("Aujourd'hui").bigTitle(34).foregroundStyle(Palette.textPrimary)
                     Spacer()
-                    Button {
-                        model.go(to: .evolution)
-                    } label: {
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .fill(Palette.surface)
-                            .frame(width: 40, height: 40)
-                            .overlay(
-                                Image(systemName: "calendar")
-                                    .font(.system(size: 16, weight: .medium))
-                                    .foregroundStyle(Palette.textTertiary)
-                            )
-                    }
-                    .buttonStyle(.plain)
                 }
                 .padding(.horizontal, 28)
                 .padding(.top, 24)
@@ -126,26 +113,7 @@ struct TodayView: View {
                 Spacer()
 
                 HStack {
-                    Button {
-                        model.go(to: .upcoming)
-                    } label: {
-                        HStack(spacing: 8) {
-                            Text("Jours à venir")
-                                .font(.app(15, .semibold))
-                                .foregroundStyle(Palette.textSecondary)
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundStyle(Palette.textMuted)
-                        }
-                        .padding(.horizontal, 18)
-                        .frame(height: 46)
-                        .background(Palette.surfaceRaised, in: Capsule())
-                        .overlay(Capsule().stroke(Palette.hairline, lineWidth: 1))
-                    }
-                    .buttonStyle(.plain)
-
                     Spacer()
-
                     MicButton { model.isListening = true }
                 }
                 .padding(.horizontal, 28)
@@ -194,7 +162,7 @@ struct TodayView: View {
                 .foregroundStyle(Palette.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
             PrimaryButton(title: "Démarrer le focus", height: 56) {
-                model.go(to: .hyperfocus)
+                model.inFocus = true
             }
         }
         .padding(24)
@@ -243,7 +211,7 @@ struct HyperfocusView: View {
         PhoneScreen(time: "6:23", trailing: "FOCUS", trailingIsLabel: true) {
             VStack(spacing: 0) {
                 HStack {
-                    BackButton { model.go(to: .today) }
+                    BackButton { model.inFocus = false }
                     Spacer()
                     Text(model.currentTask?.title ?? "")
                         .font(.app(13, .semibold))
