@@ -165,11 +165,27 @@ struct AttuneView: View {
     var body: some View {
         PhoneScreen(time: "9:41", trailing: "v1") {
             VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 7) {
-                    ForEach(0..<3, id: \.self) { i in
-                        Capsule()
-                            .fill(i <= step ? Palette.accent : Color.white.opacity(0.12))
-                            .frame(width: i == step ? 24 : 7, height: 4)
+                HStack(spacing: 14) {
+                    if step > 0 {
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.25)) { step -= 1 }
+                        } label: {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(Palette.textMuted)
+                                .frame(width: 32, height: 32)
+                                .background(Palette.surface, in: Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .transition(.opacity)
+                    }
+
+                    HStack(spacing: 7) {
+                        ForEach(0..<3, id: \.self) { i in
+                            Capsule()
+                                .fill(i <= step ? Palette.accent : Color.white.opacity(0.12))
+                                .frame(width: i == step ? 24 : 7, height: 4)
+                        }
                     }
                 }
                 .padding(.top, 32)
