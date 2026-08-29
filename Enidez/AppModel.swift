@@ -33,8 +33,8 @@ struct DayTask: Identifiable, Codable {
 }
 
 /// Une échéance à venir.
-struct Deadline: Identifiable {
-    let id = UUID()
+struct Deadline: Identifiable, Codable {
+    var id = UUID()
     var day: String       // « MER 19 »
     var title: String
     var hasAccent: Bool = false
@@ -50,15 +50,30 @@ final class AppModel {
     var screen: Screen = .welcome { didSet { persist() } }
 
     /// Vrai quand l'assistant écoute (retour visuel du micro).
-    /// Transitoire : jamais sauvegardé.
-    var isListening = false
+    /// Transitoire : jamais sauvegardé. Ouvre et ferme le micro, puis
+    /// interprète ce qui a été dit selon l'écran où l'on se trouve.
+    var isListening = false {
+        didSet {
+            guard isListening != oldValue else { return }
+            if isListening {
+                Task { await speech.start() }
+            } else {
+                interpret(speech.stop())
+            }
+        }
+    }
 
     /// Ce que l'assistant sait de toi : sommeil, activité, focus, humeur.
     /// Part de données d'exemple, puis s'enrichit avec Apple Santé.
     var life = LifeContext.sample { didSet { persist() } }
 
-    /// Accès à Apple Santé.
+    /// Les pensées parasites confiées pendant un focus. On les garde, on ne
+    /// les affiche pas en pleine figure.
+    var capturedThoughts: [String] = [] { didSet { persist() } }
+
+    /// Accès à Apple Santé et au micro.
     private let health = HealthService()
+    let speech = SpeechService()
 
     /// Les deux choses qui comptent maintenant.
     /// La première est active, la seconde attend son tour.
@@ -78,11 +93,11 @@ final class AppModel {
     }
 
     /// Les prochaines échéances des jours à venir.
-    let deadlines: [Deadline] = [
+    var deadlines: [Deadline] = [
         Deadline(day: "MER 19", title: "Dossier mutuelle", hasAccent: true),
         Deadline(day: "VEN 21", title: "Rendez-vous kiné"),
         Deadline(day: "LUN 24", title: "Courses de la semaine")
-    ]
+    ] { didSet { persist() } }
 
     /// Faux tant que le chargement initial n'est pas fini : empêche de
     /// réécrire l'état pendant qu'on est en train de le lire.
@@ -104,6 +119,8 @@ final class AppModel {
         guard let saved = Store.load() else { return }
 
         tasks = saved.tasks
+        deadlines = saved.deadlines
+        capturedThoughts = saved.capturedThoughts
         life.lastMood = saved.lastMood
         life.targetBedtime = saved.targetBedtime
 
@@ -121,6 +138,8 @@ final class AppModel {
         Store.save(StoredState(
             screen: screen,
             tasks: tasks,
+            deadlines: deadlines,
+            capturedThoughts: capturedThoughts,
             lastMood: life.lastMood,
             targetBedtime: life.targetBedtime,
             savedAt: Date()
@@ -163,5 +182,42 @@ final class AppModel {
     /// Enregistre l'humeur ressentie du moment.
     func record(mood: Mood) {
         life.lastMood = mood
+    }
+
+    // MARK: - Voix
+
+    /// Donne un sens à ce qui vient d'être dit, selon l'écran où l'on est.
+    /// Une phrase vide ne fait rien.
+    private func interpret(_ phrase: String) {
+        let phrase = phrase.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !phrase.isEmpty else { return }
+
+        switch screen {
+        case .hyperfocus:
+            // « Une pensée parasite ? Dis-la-moi, je la garde. »
+            capturedThoughts.append(phrase)
+
+        case .upcoming:
+            // « Jeudi, penser au dentiste » — on la place.
+            deadlines.append(VoiceInterpreter.deadline(from: phrase))
+
+        case .twoThings:
+            // « Changer une des deux » : on remplace celle qui attend.
+            let newThing = VoiceInterpreter.task(from: phrase)
+            if let waiting = tasks.firstIndex(where: { !$0.isDone && $0.id != currentTask?.id }) {
+                tasks[waiting] = newThing
+            } else {
+                tasks.append(newThing)
+            }
+
+        default:
+            // Partout ailleurs : ce qui est dit devient la chose du moment.
+            let newThing = VoiceInterpreter.task(from: phrase)
+            if let current = tasks.firstIndex(where: { !$0.isDone }) {
+                tasks.insert(newThing, at: current)
+            } else {
+                tasks.append(newThing)
+            }
+        }
     }
 }

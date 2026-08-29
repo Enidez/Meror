@@ -255,6 +255,8 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Enidez lit ton sommeil et ton activité depuis Apple Santé pour adapter ses conseils à ta journée.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Enidez utilise le micro quand tu appuies pour parler.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Enidez transcrit ce que tu dis pour le noter à ta place.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -300,6 +302,8 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Enidez lit ton sommeil et ton activité depuis Apple Santé pour adapter ses conseils à ta journée.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Enidez utilise le micro quand tu appuies pour parler.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Enidez transcrit ce que tu dis pour le noter à ta place.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;

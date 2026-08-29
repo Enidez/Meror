@@ -151,9 +151,22 @@ struct BackButton: View {
 /// Voile d'écoute affiché quand l'assistant capte la voix.
 struct ListeningOverlay: View {
     var name: String
+    var transcript: String = ""
+    var status: SpeechService.Status = .listening
     var onDone: () -> Void
 
     @State private var pulse = false
+
+    /// Message sous le titre : le texte en cours, ou un repli si la dictée
+    /// n'est pas disponible.
+    private var hint: String {
+        if !transcript.isEmpty { return transcript }
+        switch status {
+        case .denied:      return "Micro refusé. Réglages → Enidez pour l'autoriser."
+        case .unavailable: return "La dictée n'est pas disponible ici. Note au doigt."
+        default:           return "Parle, je note."
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -175,9 +188,13 @@ struct ListeningOverlay: View {
                     .tracking(-0.5)
                     .foregroundStyle(Palette.textPrimary)
 
-                Text("Parle, je note.")
-                    .font(.app(16, .medium))
-                    .foregroundStyle(Palette.textTertiary)
+                Text(hint)
+                    .font(.app(transcript.isEmpty ? 16 : 20, transcript.isEmpty ? .medium : .semibold))
+                    .foregroundStyle(transcript.isEmpty ? Palette.textTertiary : Palette.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(4)
+                    .padding(.horizontal, 40)
+                    .animation(.easeOut(duration: 0.15), value: transcript)
             }
             .padding(.bottom, 40)
 

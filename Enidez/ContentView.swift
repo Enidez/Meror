@@ -21,7 +21,9 @@ struct ContentView: View {
                 .id(screenID)
 
             if model.isListening {
-                ListeningOverlay(name: model.name) {
+                ListeningOverlay(name: model.name,
+                                 transcript: model.speech.transcript,
+                                 status: model.speech.status) {
                     withAnimation(.easeInOut(duration: 0.25)) {
                         model.isListening = false
                     }

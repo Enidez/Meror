@@ -16,13 +16,15 @@ import Foundation
 struct StoredState: Codable {
     var screen: Screen
     var tasks: [DayTask]
+    var deadlines: [Deadline]
+    var capturedThoughts: [String]
     var lastMood: Mood?
     var targetBedtime: Date
     var savedAt: Date
 }
 
 enum Store {
-    private static let key = "enidez.state.v1"
+    private static let key = "enidez.state.v2"
 
     /// Relit l'état sauvegardé, ou `nil` s'il n'y en a pas (ou s'il est illisible).
     static func load() -> StoredState? {
