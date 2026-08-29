@@ -10,7 +10,8 @@
 import SwiftUI
 
 /// Les écrans du parcours, dans l'ordre narratif du matin.
-enum Screen {
+/// `String` + `Codable` pour pouvoir retrouver son fil au relancement.
+enum Screen: String, Codable {
     case welcome      // 3i — Bienvenue
     case wakeUp       // 3a — Le réveil
     case coffeeBreak  // 3b — La pause café
@@ -24,8 +25,8 @@ enum Screen {
 }
 
 /// Une chose qui compte dans la journée.
-struct DayTask: Identifiable {
-    let id = UUID()
+struct DayTask: Identifiable, Codable {
+    var id = UUID()
     var title: String
     var minutes: Int
     var isDone = false
@@ -46,14 +47,15 @@ final class AppModel {
     let name = "Léa"
 
     /// L'écran affiché. Une seule chose à l'écran à la fois.
-    var screen: Screen = .welcome
+    var screen: Screen = .welcome { didSet { persist() } }
 
     /// Vrai quand l'assistant écoute (retour visuel du micro).
+    /// Transitoire : jamais sauvegardé.
     var isListening = false
 
     /// Ce que l'assistant sait de toi : sommeil, activité, focus, humeur.
     /// Part de données d'exemple, puis s'enrichit avec Apple Santé.
-    var life = LifeContext.sample
+    var life = LifeContext.sample { didSet { persist() } }
 
     /// Accès à Apple Santé.
     private let health = HealthService()
@@ -63,7 +65,7 @@ final class AppModel {
     var tasks: [DayTask] = [
         DayTask(title: "Appeler le plombier", minutes: 5),
         DayTask(title: "Rédiger le mail aux impôts", minutes: 15)
-    ]
+    ] { didSet { persist() } }
 
     /// La tâche du moment (la première non terminée).
     var currentTask: DayTask? {
@@ -81,6 +83,49 @@ final class AppModel {
         Deadline(day: "VEN 21", title: "Rendez-vous kiné"),
         Deadline(day: "LUN 24", title: "Courses de la semaine")
     ]
+
+    /// Faux tant que le chargement initial n'est pas fini : empêche de
+    /// réécrire l'état pendant qu'on est en train de le lire.
+    private var isReady = false
+
+    // MARK: - Cycle de vie
+
+    init() {
+        restore()
+        isReady = true
+        // Aligne tout de suite le disque sur l'état réellement affiché
+        // (utile quand `restore` a remis les compteurs à zéro pour un nouveau jour).
+        persist()
+    }
+
+    /// Relit l'état sauvegardé. « Un jour » : le même jour on retrouve son fil ;
+    /// un jour plus tard, on repart du début et les deux choses reprennent à zéro.
+    private func restore() {
+        guard let saved = Store.load() else { return }
+
+        tasks = saved.tasks
+        life.lastMood = saved.lastMood
+        life.targetBedtime = saved.targetBedtime
+
+        if Calendar.current.isDateInToday(saved.savedAt) {
+            screen = saved.screen
+        } else {
+            screen = .welcome
+            for index in tasks.indices { tasks[index].isDone = false }
+        }
+    }
+
+    /// Écrit l'état courant. Sans effet pendant le chargement initial.
+    private func persist() {
+        guard isReady else { return }
+        Store.save(StoredState(
+            screen: screen,
+            tasks: tasks,
+            lastMood: life.lastMood,
+            targetBedtime: life.targetBedtime,
+            savedAt: Date()
+        ))
+    }
 
     // MARK: - Navigation
 

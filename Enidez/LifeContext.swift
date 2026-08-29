@@ -10,7 +10,7 @@
 import Foundation
 
 /// Un état ressenti, capté rapidement (à la voix ou d'un geste).
-enum Mood: String, CaseIterable, Identifiable {
+enum Mood: String, CaseIterable, Identifiable, Codable {
     case good = "En forme"
     case ok = "Ça va"
     case low = "Difficile"
