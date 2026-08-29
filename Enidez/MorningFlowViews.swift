@@ -37,15 +37,12 @@ struct WelcomeView: View {
                 Spacer()
 
                 VStack(spacing: 12) {
-                    HStack(spacing: 12) {
-                        PrimaryButton(title: "Commencer", height: 60) {
-                            model.go(to: .wakeUp)
-                        }
-                        MicButton(size: 60) { model.isListening = true }
+                    PrimaryButton(title: "Commencer", height: 60) {
+                        model.go(to: .onboarding)
                     }
 
                     Button {
-                        model.go(to: .wakeUp)
+                        model.go(to: .onboarding)
                     } label: {
                         HStack(spacing: 10) {
                             Image(systemName: "apple.logo")
@@ -88,6 +85,70 @@ struct WelcomeView: View {
                 }
                 .fixedSize()
             )
+    }
+}
+
+// MARK: - Premier lancement · Ton prénom
+
+struct OnboardingView: View {
+    @Environment(AppModel.self) private var model
+
+    @State private var name = ""
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        PhoneScreen(time: "9:41", trailing: "v1") {
+            VStack(alignment: .leading, spacing: 0) {
+                Spacer()
+
+                VStack(alignment: .leading, spacing: 26) {
+                    Circle()
+                        .fill(Palette.accent)
+                        .frame(width: 8, height: 8)
+
+                    (Text("Comment on\n")
+                        + Text("t'appelle ?").foregroundColor(Palette.textSecondary))
+                        .bigTitle(36)
+                        .foregroundStyle(Palette.textPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    TextField("", text: $name, prompt: Text("Ton prénom").foregroundColor(Palette.textFaint))
+                        .font(.app(28, .heavy))
+                        .tracking(-0.8)
+                        .foregroundStyle(Palette.textPrimary)
+                        .tint(Palette.accent)
+                        .textContentType(.givenName)
+                        .autocorrectionDisabled()
+                        .submitLabel(.done)
+                        .focused($focused)
+                        .onSubmit(save)
+                        .padding(.vertical, 14)
+                        .overlay(alignment: .bottom) {
+                            Rectangle()
+                                .fill(focused ? Palette.accent : Palette.hairline)
+                                .frame(height: 2)
+                        }
+
+                    Text("Juste pour te parler comme il faut. Ça reste sur ton téléphone.")
+                        .font(.app(15, .medium))
+                        .foregroundStyle(Palette.textTertiary)
+                        .lineSpacing(4)
+                }
+
+                Spacer()
+
+                PrimaryButton(title: "C'est parti") { save() }
+                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .opacity(name.trimmingCharacters(in: .whitespaces).isEmpty ? 0.4 : 1)
+            }
+            .padding(.horizontal, 34)
+            .padding(.bottom, 20)
+        }
+        .onAppear { focused = true }
+    }
+
+    private func save() {
+        model.completeOnboarding(name: name)
     }
 }
 

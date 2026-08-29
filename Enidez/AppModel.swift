@@ -13,6 +13,7 @@ import SwiftUI
 /// `String` + `Codable` pour pouvoir retrouver son fil au relancement.
 enum Screen: String, Codable {
     case welcome      // 3i — Bienvenue
+    case onboarding   // Premier lancement : ton prénom
     case wakeUp       // 3a — Le réveil
     case coffeeBreak  // 3b — La pause café
     case afterCoffee  // 3c — Après le café
@@ -43,8 +44,12 @@ struct Deadline: Identifiable, Codable {
 @MainActor
 @Observable
 final class AppModel {
-    /// Le prénom de la personne accompagnée.
-    let name = "Léa"
+    /// Le prénom de la personne accompagnée. « Léa » par défaut (aperçus,
+    /// données d'exemple) ; remplacé au premier lancement.
+    var name = "Léa" { didSet { persist() } }
+
+    /// Vrai une fois le prénom donné : on ne repasse plus par la bienvenue.
+    var isOnboarded = false { didSet { persist() } }
 
     /// L'écran affiché. Une seule chose à l'écran à la fois.
     var screen: Screen = .welcome { didSet { persist() } }
@@ -118,6 +123,8 @@ final class AppModel {
     private func restore() {
         guard let saved = Store.load() else { return }
 
+        name = saved.name
+        isOnboarded = saved.isOnboarded
         tasks = saved.tasks
         deadlines = saved.deadlines
         capturedThoughts = saved.capturedThoughts
@@ -127,7 +134,8 @@ final class AppModel {
         if Calendar.current.isDateInToday(saved.savedAt) {
             screen = saved.screen
         } else {
-            screen = .welcome
+            // Nouveau jour : on repart au début, mais on ne redemande pas le prénom.
+            screen = isOnboarded ? .wakeUp : .welcome
             for index in tasks.indices { tasks[index].isDone = false }
         }
     }
@@ -136,6 +144,8 @@ final class AppModel {
     private func persist() {
         guard isReady else { return }
         Store.save(StoredState(
+            name: name,
+            isOnboarded: isOnboarded,
             screen: screen,
             tasks: tasks,
             deadlines: deadlines,
@@ -144,6 +154,17 @@ final class AppModel {
             targetBedtime: life.targetBedtime,
             savedAt: Date()
         ))
+    }
+
+    // MARK: - Onboarding
+
+    /// Enregistre le prénom donné au premier lancement et enchaîne sur le réveil.
+    /// Un prénom vide garde « Léa ».
+    func completeOnboarding(name raw: String) {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty { name = trimmed }
+        isOnboarded = true
+        go(to: .wakeUp)
     }
 
     // MARK: - Navigation

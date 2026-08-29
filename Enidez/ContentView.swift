@@ -45,6 +45,7 @@ struct ContentView: View {
     private var currentScreen: some View {
         switch model.screen {
         case .welcome:     WelcomeView()
+        case .onboarding:  OnboardingView()
         case .wakeUp:      WakeUpView()
         case .coffeeBreak: CoffeeBreakView()
         case .afterCoffee: AfterCoffeeView()
@@ -61,6 +62,7 @@ struct ContentView: View {
     private var screenID: Int {
         switch model.screen {
         case .welcome: 0
+        case .onboarding: 10
         case .wakeUp: 1
         case .coffeeBreak: 2
         case .afterCoffee: 3
