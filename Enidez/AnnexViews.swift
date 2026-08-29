@@ -38,7 +38,8 @@ struct UpcomingView: View {
     }
 
     private var header: some View {
-        HStack {
+        HStack(spacing: 14) {
+            BackButton { model.go(to: .today) }
             Text("À venir").bigTitle(30).foregroundStyle(Palette.textPrimary)
             Spacer()
             Button {
