@@ -10,8 +10,9 @@ import SwiftUI
 
 // MARK: - Ossature d'écran
 
-/// Enveloppe commune : fond noir, barre d'état en haut, contenu au centre,
-/// indicateur d'accueil en bas. Reproduit le cadre des maquettes.
+/// Enveloppe commune : fond noir, bandeau contextuel en haut, contenu au centre.
+/// Sur appareil, l'iPhone fournit lui-même la barre d'état et l'indicateur
+/// d'accueil — on ne les redessine pas.
 struct PhoneScreen<Content: View>: View {
     var time: String
     var trailing: String
@@ -23,7 +24,6 @@ struct PhoneScreen<Content: View>: View {
             StatusBar(time: time, trailing: trailing, trailingIsLabel: trailingIsLabel)
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            HomeIndicator()
         }
         .background(Palette.screen.ignoresSafeArea())
     }
@@ -57,16 +57,6 @@ struct StatusBar: View {
     }
 }
 
-/// Le petit trait d'accueil au bas de l'écran.
-struct HomeIndicator: View {
-    var body: some View {
-        Capsule()
-            .fill(Color.white.opacity(0.85))
-            .frame(width: 130, height: 5)
-            .frame(maxWidth: .infinity)
-            .padding(.bottom, 8)
-    }
-}
 
 // MARK: - Boutons
 
