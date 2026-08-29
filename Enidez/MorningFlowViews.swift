@@ -322,8 +322,8 @@ struct CoffeeBreakView: View {
             VStack(spacing: 0) {
                 Spacer()
 
-                VStack(spacing: 34) {
-                    HourglassView()
+                VStack(spacing: 40) {
+                    PauseMark()
                     Text("à tout de suite")
                         .font(.app(19, .medium))
                         .italic()

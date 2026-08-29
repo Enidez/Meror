@@ -266,61 +266,47 @@ struct ListeningOverlay: View {
     }
 }
 
-// MARK: - Sablier (3b)
+// MARK: - L'attente (pause café)
 
-/// Sablier stylisé : un X fermé en haut et en bas, du sable qui s'écoule.
-struct HourglassView: View {
+/// Le temps qui passe, dans la langue de Meror : la marque à neuf points,
+/// et une lumière verte qui descend la diagonale, encore et encore. Calme,
+/// sans compte à rebours.
+struct PauseMark: View {
+    private let unit: CGFloat = 13
+    private let gap: CGFloat = 22
+
     var body: some View {
-        GeometryReader { geo in
-            let w = geo.size.width
-            let h = geo.size.height
-            let cx = w / 2
-            let cy = h / 2
+        TimelineView(.animation) { timeline in
+            let t = timeline.date.timeIntervalSinceReferenceDate
+            let cycle = 3.4
+            let phase = t.truncatingRemainder(dividingBy: cycle) / cycle
+            // Descente sur 70 % du cycle, repos sombre sur le reste.
+            let travel = phase > 0.7 ? -1 : min(phase / 0.7, 1.0)
 
-            ZStack {
-                // Sable restant, en haut (léger).
-                Path { p in
-                    p.move(to: CGPoint(x: w * 0.30, y: h * 0.31))
-                    p.addLine(to: CGPoint(x: w * 0.70, y: h * 0.31))
-                    p.addLine(to: CGPoint(x: cx, y: cy))
-                    p.closeSubpath()
+            VStack(spacing: gap) {
+                ForEach(0..<3, id: \.self) { row in
+                    HStack(spacing: gap) {
+                        ForEach(0..<3, id: \.self) { col in
+                            dot(onDiagonal: row == col, center: Double(row) / 2, travel: travel)
+                        }
+                    }
                 }
-                .fill(Palette.hourglass.opacity(0.3))
-
-                // Sable écoulé, en bas (dense).
-                Path { p in
-                    p.move(to: CGPoint(x: w * 0.25, y: h * 0.93))
-                    p.addLine(to: CGPoint(x: w * 0.75, y: h * 0.93))
-                    p.addLine(to: CGPoint(x: cx, y: h * 0.69))
-                    p.closeSubpath()
-                }
-                .fill(Palette.hourglass.opacity(0.85))
-
-                // Le filet de sable au centre.
-                Path { p in
-                    p.move(to: CGPoint(x: cx, y: cy))
-                    p.addLine(to: CGPoint(x: cx, y: h * 0.74))
-                }
-                .stroke(Palette.hourglass.opacity(0.55), style: .init(lineWidth: 1.6, lineCap: .round))
-
-                // Le cadre : barres haut/bas et le X.
-                Path { p in
-                    p.move(to: CGPoint(x: w * 0.13, y: h * 0.06))
-                    p.addLine(to: CGPoint(x: w * 0.87, y: h * 0.06))
-                    p.move(to: CGPoint(x: w * 0.13, y: h * 0.94))
-                    p.addLine(to: CGPoint(x: w * 0.87, y: h * 0.94))
-
-                    p.move(to: CGPoint(x: w * 0.18, y: h * 0.07))
-                    p.addLine(to: CGPoint(x: cx, y: cy))
-                    p.addLine(to: CGPoint(x: w * 0.82, y: h * 0.07))
-                    p.move(to: CGPoint(x: w * 0.18, y: h * 0.93))
-                    p.addLine(to: CGPoint(x: cx, y: cy))
-                    p.addLine(to: CGPoint(x: w * 0.82, y: h * 0.93))
-                }
-                .stroke(Color.white.opacity(0.3), style: .init(lineWidth: 2.6, lineCap: .round, lineJoin: .round))
             }
         }
-        .frame(width: 110, height: 154)
+        .frame(width: unit * 3 + gap * 2, height: unit * 3 + gap * 2)
+    }
+
+    private func dot(onDiagonal: Bool, center: Double, travel: Double) -> some View {
+        let glow = (travel < 0 || !onDiagonal)
+            ? 0.0
+            : max(0, 1 - abs(travel - center) * 3.2)
+
+        return Circle()
+            .fill(Color.white.opacity(0.12))
+            .overlay(Circle().fill(Palette.accent).opacity(glow))
+            .frame(width: unit, height: unit)
+            .scaleEffect(1 + glow * 0.55)
+            .shadow(color: Palette.accent.opacity(glow * 0.5), radius: glow * 9)
     }
 }
 
