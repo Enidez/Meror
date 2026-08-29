@@ -47,7 +47,7 @@ struct ContentView: View {
         case .wakeUp:      WakeUpView()
         case .coffeeBreak: CoffeeBreakView()
         case .afterCoffee: AfterCoffeeView()
-        case .twoThings:   TwoThingsView()
+        case .triage:      TriageView()
         case .app:         AppTabs()
         }
     }

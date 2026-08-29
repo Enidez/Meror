@@ -32,7 +32,7 @@ struct YouView: View {
                         adviceCard
                         bedtimeSection($model.life.targetBedtime)
                         connectionNote
-                        Text(AdviceEngine.summaryLine(model.life))
+                        Text(AdviceEngine.summaryLine(closedThisWeek: model.closedThisWeek))
                             .font(.app(14, .medium))
                             .foregroundStyle(Palette.textMuted)
                             .padding(.top, 2)
@@ -122,11 +122,19 @@ struct YouView: View {
 
     // MARK: - Focus
 
+    @ViewBuilder
     private var focusSection: some View {
         Card {
             Text("TON RYTHME").sectionLabel()
-            metric("Meilleur moment", value: model.life.bestFocusPeriod.label)
-            metric("Régularité", value: "\(model.life.focusStreakDays) jours")
+            if model.life.focusStreakDays > 0 {
+                metric("Meilleur moment", value: model.life.bestFocusPeriod.label)
+                metric("Régularité", value: "\(model.life.focusStreakDays) jours")
+            } else {
+                Text("Encore trop tôt pour voir ton rythme. Reviens dans quelques jours.")
+                    .font(.app(15, .medium))
+                    .foregroundStyle(Palette.textTertiary)
+                    .lineSpacing(4)
+            }
         }
     }
 

@@ -3,12 +3,12 @@
 //  Enidez
 //
 //  État de l'application et coordination du parcours.
-//  La complexité (priorisation, planification) reste ici, côté machine ;
-//  l'utilisateur ne voit jamais la mécanique.
+//  La complexité — tout ce que tu as à faire, et le tri — reste ici, côté
+//  machine. Toi, tu ne vois que deux choses à la fois.
 //
 //  Deux temps :
-//   1. le rituel du matin — un plein écran linéaire, fait une fois par jour
-//      (bienvenue → prénom → réveil → café → les deux choses) ;
+//   1. le rituel du matin — plein écran, une fois par jour
+//      (bienvenue → prénom → réveil → café → le tri) ;
 //   2. l'app — trois onglets : Aujourd'hui · À venir · Toi.
 //
 
@@ -16,31 +16,23 @@ import SwiftUI
 
 /// Les étapes du rituel du matin, puis `.app` une fois qu'on est entré.
 enum Screen: String, Codable {
-    case welcome      // Bienvenue
-    case onboarding   // Premier lancement : ton prénom
-    case wakeUp       // Le réveil
-    case coffeeBreak  // La pause café
-    case afterCoffee  // Après le café
-    case twoThings    // Les deux choses
+    case welcome
+    case onboarding
+    case wakeUp
+    case coffeeBreak
+    case afterCoffee
+    case triage       // Le tri : quelles deux choses aujourd'hui
     case app          // Rituel terminé : on vit dans les onglets
 }
 
 /// Les onglets de l'app.
 enum AppTab: String, Codable, CaseIterable {
-    case today     // Aujourd'hui
-    case upcoming  // À venir
-    case you       // Toi
+    case today
+    case upcoming
+    case you
 }
 
-/// Une chose qui compte dans la journée.
-struct DayTask: Identifiable, Codable {
-    var id = UUID()
-    var title: String
-    var minutes: Int
-    var isDone = false
-}
-
-/// Une échéance à venir.
+/// Une échéance à venir (le calendrier). Sera fondu dans `Item` plus tard.
 struct Deadline: Identifiable, Codable {
     var id = UUID()
     var day: String       // « MER 19 »
@@ -51,11 +43,10 @@ struct Deadline: Identifiable, Codable {
 @MainActor
 @Observable
 final class AppModel {
-    /// Le prénom de la personne accompagnée. « Léa » par défaut (aperçus,
-    /// données d'exemple) ; remplacé au premier lancement.
+    /// Le prénom de la personne accompagnée.
     var name = "Léa" { didSet { persist() } }
 
-    /// Vrai une fois le prénom donné : on ne repasse plus par la bienvenue.
+    /// Vrai une fois le prénom donné.
     var isOnboarded = false { didSet { persist() } }
 
     /// Où l'on en est : une étape du rituel, ou `.app`.
@@ -64,12 +55,10 @@ final class AppModel {
     /// L'onglet actif quand `screen == .app`.
     var tab: AppTab = .today { didSet { persist() } }
 
-    /// Vrai quand le minuteur de focus est ouvert par-dessus l'onglet
-    /// Aujourd'hui. Transitoire : le focus ne survit pas à une fermeture.
+    /// Vrai quand le minuteur de focus est ouvert par-dessus Aujourd'hui.
     var inFocus = false
 
     /// Vrai quand l'assistant écoute (retour visuel du micro).
-    /// Transitoire. Ouvre et ferme le micro, puis interprète ce qui a été dit.
     var isListening = false {
         didSet {
             guard isListening != oldValue else { return }
@@ -84,39 +73,54 @@ final class AppModel {
     /// Ce que l'assistant sait de toi : sommeil, activité, focus, humeur.
     var life = LifeContext.sample { didSet { persist() } }
 
-    /// Les pensées parasites confiées pendant un focus. On les garde, on ne
-    /// les affiche pas en pleine figure.
+    /// Les pensées parasites confiées pendant un focus.
     var capturedThoughts: [String] = [] { didSet { persist() } }
 
-    /// Accès à Apple Santé et au micro.
-    private let health = HealthService()
-    let speech = SpeechService()
+    /// Tout ce que tu as à faire. Le backlog. La plupart est gardée de côté ;
+    /// deux choses au plus sont « choisies » pour le jour.
+    var items: [Item] = Item.starter { didSet { persist() } }
 
-    /// Les deux choses qui comptent maintenant.
-    var tasks: [DayTask] = [
-        DayTask(title: "Appeler le plombier", minutes: 5),
-        DayTask(title: "Rédiger le mail aux impôts", minutes: 15)
-    ] { didSet { persist() } }
-
-    /// La tâche du moment (la première non terminée).
-    var currentTask: DayTask? {
-        tasks.first { !$0.isDone }
-    }
-
-    /// La tâche suivante, discrète, sous la carte du moment.
-    var nextTask: DayTask? {
-        tasks.filter { !$0.isDone }.dropFirst().first
-    }
-
-    /// Les prochaines échéances des jours à venir.
+    /// Les échéances datées (onglet À venir).
     var deadlines: [Deadline] = [
         Deadline(day: "MER 19", title: "Dossier mutuelle", hasAccent: true),
         Deadline(day: "VEN 21", title: "Rendez-vous kiné"),
         Deadline(day: "LUN 24", title: "Courses de la semaine")
     ] { didSet { persist() } }
 
-    /// Faux tant que le chargement initial n'est pas fini.
+    /// Sélection en cours sur l'écran de tri (max 2).
+    var triagePicks: [UUID] = []
+
+    /// Accès à Apple Santé et au micro.
+    private let health = HealthService()
+    let speech = SpeechService()
+
     private var isReady = false
+
+    // MARK: - Les deux choses du jour
+
+    /// Les choses choisies pour aujourd'hui, encore ouvertes, dans l'ordre.
+    var todayPicks: [Item] {
+        items.filter(\.isPickedToday)
+    }
+
+    /// La chose du moment.
+    var currentPick: Item? { todayPicks.first }
+
+    /// La chose suivante, discrète.
+    var nextPick: Item? { todayPicks.dropFirst().first }
+
+    /// Ce qui est gardé de côté : ouvert, non choisi aujourd'hui, sans échéance passée.
+    var heldItems: [Item] {
+        items.filter { $0.isOpen && !$0.isPickedToday }
+            .sorted { ($0.due ?? .distantFuture) < ($1.due ?? .distantFuture) }
+    }
+
+    /// Nombre de choses bouclées cette semaine (vrai compteur).
+    var closedThisWeek: Int {
+        let cal = Calendar.current
+        guard let weekStart = cal.dateInterval(of: .weekOfYear, for: Date())?.start else { return 0 }
+        return items.filter { ($0.doneAt ?? .distantPast) >= weekStart }.count
+    }
 
     // MARK: - Cycle de vie
 
@@ -126,15 +130,13 @@ final class AppModel {
         persist()
     }
 
-    /// Relit l'état sauvegardé. « Un jour » : le même jour on retrouve son fil ;
-    /// un jour plus tard on refait le réveil, et les deux choses reprennent à zéro.
     private func restore() {
         guard let saved = Store.load() else { return }
 
         name = saved.name
         isOnboarded = saved.isOnboarded
         tab = saved.tab
-        tasks = saved.tasks
+        items = saved.items
         deadlines = saved.deadlines
         capturedThoughts = saved.capturedThoughts
         life.lastMood = saved.lastMood
@@ -145,7 +147,12 @@ final class AppModel {
         } else {
             screen = isOnboarded ? .wakeUp : .welcome
             tab = .today
-            for index in tasks.indices { tasks[index].isDone = false }
+        }
+
+        // Relancé en plein tri : on repropose deux choses (la sélection en
+        // cours n'est pas sauvegardée, c'est un choix du moment).
+        if screen == .triage {
+            triagePicks = Planner.suggestions(from: items).map(\.item.id)
         }
     }
 
@@ -156,7 +163,7 @@ final class AppModel {
             isOnboarded: isOnboarded,
             screen: screen,
             tab: tab,
-            tasks: tasks,
+            items: items,
             deadlines: deadlines,
             capturedThoughts: capturedThoughts,
             lastMood: life.lastMood,
@@ -167,7 +174,6 @@ final class AppModel {
 
     // MARK: - Onboarding
 
-    /// Enregistre le prénom donné au premier lancement et enchaîne sur le réveil.
     func completeOnboarding(name raw: String) {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmed.isEmpty { name = trimmed }
@@ -177,14 +183,17 @@ final class AppModel {
 
     // MARK: - Navigation
 
-    /// Passe à une étape du rituel, en douceur.
     func go(to screen: Screen) {
         withAnimation(.easeInOut(duration: 0.4)) {
             self.screen = screen
         }
     }
 
-    /// Sort du rituel et entre dans l'app, sur l'onglet Aujourd'hui.
+    func show(_ tab: AppTab) {
+        withAnimation(.easeInOut(duration: 0.25)) { self.tab = tab }
+    }
+
+    /// Sort du rituel et entre dans l'app.
     func enterApp() {
         withAnimation(.easeInOut(duration: 0.4)) {
             screen = .app
@@ -192,17 +201,50 @@ final class AppModel {
         }
     }
 
-    /// Change d'onglet.
-    func show(_ tab: AppTab) {
-        withAnimation(.easeInOut(duration: 0.25)) {
-            self.tab = tab
+    // MARK: - Tri du matin
+
+    /// Ouvre l'écran de tri, pré-rempli des deux suggestions.
+    func startTriage() {
+        triagePicks = Planner.suggestions(from: items).map(\.item.id)
+        go(to: .triage)
+    }
+
+    /// La raison affichée sous une suggestion, s'il y en a une.
+    func triageReason(for id: UUID) -> String? {
+        Planner.suggestions(from: items).first { $0.item.id == id }?.reason
+    }
+
+    /// Coche / décoche une chose pour aujourd'hui (deux au maximum).
+    func toggleTriage(_ id: UUID) {
+        if let index = triagePicks.firstIndex(of: id) {
+            triagePicks.remove(at: index)
+        } else if triagePicks.count < 2 {
+            triagePicks.append(id)
         }
     }
 
-    /// Marque la tâche du moment comme faite et ferme le focus.
-    func completeCurrentTask() {
-        if let index = tasks.firstIndex(where: { !$0.isDone }) {
-            tasks[index].isDone = true
+    /// Fige la sélection du jour et entre dans l'app.
+    func confirmTriage() {
+        let suggested = Set(Planner.suggestions(from: items).map(\.item.id))
+        let now = Date()
+        for index in items.indices where items[index].isOpen {
+            let id = items[index].id
+            if triagePicks.contains(id) {
+                items[index].pickedOn = now
+            } else if suggested.contains(id) {
+                // Suggérée mais écartée à la main : on s'en souvient.
+                items[index].deferrals += 1
+            }
+        }
+        enterApp()
+    }
+
+    // MARK: - Faire / défaire
+
+    /// Marque la chose du moment comme faite et ferme le focus.
+    func completeCurrentPick() {
+        if let index = items.firstIndex(where: { $0.isPickedToday }) {
+            items[index].doneAt = Date()
         }
         inFocus = false
         tab = .today
@@ -210,7 +252,6 @@ final class AppModel {
 
     // MARK: - Contexte de vie
 
-    /// Charge les données d'Apple Santé et les fusionne dans le contexte.
     func loadHealthData() async {
         guard let snapshot = await health.requestAndFetch() else { return }
         life.healthConnected = snapshot.connected
@@ -221,53 +262,43 @@ final class AppModel {
         if let value = snapshot.activeEnergyToday { life.activeEnergyToday = value }
     }
 
-    /// Enregistre l'humeur ressentie du moment.
     func record(mood: Mood) {
         life.lastMood = mood
     }
 
     // MARK: - Saisie (écrite ou dictée)
 
-    /// Porte d'entrée commune au clavier et à la voix : la phrase est
-    /// interprétée selon le contexte, exactement comme la dictée.
+    /// Porte d'entrée commune au clavier et à la voix.
     func capture(_ text: String) {
         interpret(text)
     }
 
-    /// Donne un sens à ce qui vient d'être dit ou écrit, selon le contexte.
     private func interpret(_ phrase: String) {
         let phrase = phrase.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !phrase.isEmpty else { return }
 
         if inFocus {
-            // « Une pensée parasite ? Dis-la-moi, je la garde. »
             capturedThoughts.append(phrase)
             return
         }
 
         if screen == .app && tab == .upcoming {
-            // « Jeudi, penser au dentiste » — on la place.
             deadlines.append(VoiceInterpreter.deadline(from: phrase))
             return
         }
 
-        let newThing = VoiceInterpreter.task(from: phrase)
+        var item = VoiceInterpreter.item(from: phrase)
 
-        if screen == .twoThings {
-            // « Changer une des deux » : on remplace celle qui attend.
-            if let waiting = tasks.firstIndex(where: { !$0.isDone && $0.id != currentTask?.id }) {
-                tasks[waiting] = newThing
-            } else {
-                tasks.append(newThing)
-            }
+        if screen == .triage {
+            items.append(item)
+            if triagePicks.count < 2 { triagePicks.append(item.id) }
             return
         }
 
-        // Partout ailleurs : ce qui est dit devient la chose du moment.
-        if let current = tasks.firstIndex(where: { !$0.isDone }) {
-            tasks.insert(newThing, at: current)
-        } else {
-            tasks.append(newThing)
+        // Dans l'app : s'il reste de la place dans les deux, ça en devient une.
+        if screen == .app && tab == .today && todayPicks.count < 2 {
+            item.pickedOn = Date()
         }
+        items.append(item)
     }
 }

@@ -2,19 +2,30 @@
 //  TaskFlowViews.swift
 //  Enidez
 //
-//  Le cœur du parcours : les deux choses, l'écran du jour, l'hyperfocus.
-//  Aucune série, aucun compteur, aucun reste-à-faire. Une chose à la fois.
+//  Le cœur : le tri du matin, l'écran du jour, le focus.
+//  Aucune série imposée, aucun tableau de bord. Deux choses à la fois.
 //
 
 import SwiftUI
 
-// MARK: - 3d · Les deux choses
+// MARK: - Le tri du matin
 
-struct TwoThingsView: View {
+struct TriageView: View {
     @Environment(AppModel.self) private var model
 
+    /// Les choses ouvertes, suggestions d'abord.
+    private var openItems: [Item] {
+        let suggested = Planner.suggestions(from: model.items).map(\.item.id)
+        return model.items.filter(\.isOpen).sorted { a, b in
+            let sa = suggested.firstIndex(of: a.id) ?? Int.max
+            let sb = suggested.firstIndex(of: b.id) ?? Int.max
+            if sa != sb { return sa < sb }
+            return a.createdAt < b.createdAt
+        }
+    }
+
     var body: some View {
-        PhoneScreen(time: "6:21", trailing: "mardi 18") {
+        PhoneScreen(time: "6:22", trailing: "mardi 18") {
             VStack(alignment: .leading, spacing: 0) {
                 HStack {
                     BackButton { model.go(to: .afterCoffee) }
@@ -23,56 +34,84 @@ struct TwoThingsView: View {
                 .padding(.horizontal, 28)
                 .padding(.top, 22)
 
-                Spacer()
+                Text("Qu'est-ce qui compte\naujourd'hui ?")
+                    .bigTitle(32)
+                    .foregroundStyle(Palette.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 30)
+                    .padding(.top, 14)
 
-                VStack(alignment: .leading, spacing: 40) {
-                    VStack(alignment: .leading, spacing: 34) {
-                        ForEach(Array(model.tasks.enumerated()), id: \.element.id) { index, task in
-                            thing(task, active: index == 0)
+                Text("J'en ai choisi deux. Change si tu veux.")
+                    .font(.app(15, .medium))
+                    .foregroundStyle(Palette.textTertiary)
+                    .padding(.horizontal, 30)
+                    .padding(.top, 8)
+
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 8) {
+                        ForEach(openItems) { item in
+                            row(item)
                         }
                     }
-                    Text("Le reste du jour attend. Je le garde de côté.")
-                        .font(.app(16, .medium))
-                        .foregroundStyle(Palette.textFaint)
-                        .lineSpacing(4)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 18)
                 }
-                .padding(.horizontal, 34)
 
-                Spacer()
-
-                VStack(spacing: 14) {
-                    PrimaryButton(title: "Je les fais maintenant") {
-                        model.enterApp()
+                VStack(spacing: 12) {
+                    CaptureField(placeholder: "Ajoute une chose — écris ou dicte")
+                    PrimaryButton(title: "C'est parti") {
+                        model.confirmTriage()
                     }
-                    CaptureField(placeholder: "Changer une des deux — écris ou dicte")
+                    .disabled(model.triagePicks.isEmpty)
+                    .opacity(model.triagePicks.isEmpty ? 0.4 : 1)
                 }
-                .padding(.horizontal, 34)
+                .padding(.horizontal, 28)
                 .padding(.bottom, 20)
             }
         }
     }
 
-    private func thing(_ task: DayTask, active: Bool) -> some View {
-        HStack(alignment: .top, spacing: 16) {
-            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .fill(active ? Palette.accent : Color.white.opacity(0.18))
-                .frame(width: 7, height: 7)
-                .padding(.top, 13)
-
-            VStack(alignment: .leading, spacing: 5) {
-                Text(task.title)
-                    .font(.app(30, .heavy))
-                    .tracking(-0.9)
-                    .foregroundStyle(active ? Palette.textPrimary : Palette.textSecondary)
-                Text("\(task.minutes) min")
-                    .font(.app(15, .medium))
-                    .foregroundStyle(active ? Palette.textMuted : Palette.textTertiary)
+    private func row(_ item: Item) -> some View {
+        let picked = model.triagePicks.contains(item.id)
+        return Button {
+            withAnimation(.easeInOut(duration: 0.15)) { model.toggleTriage(item.id) }
+        } label: {
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .strokeBorder(picked ? Palette.accent : Color.white.opacity(0.18), lineWidth: 2)
+                        .frame(width: 22, height: 22)
+                    if picked {
+                        Circle().fill(Palette.accent).frame(width: 12, height: 12)
+                    }
+                }
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(item.title)
+                        .font(.app(17, .bold))
+                        .foregroundStyle(picked ? Palette.textPrimary : Palette.textSecondary)
+                        .multilineTextAlignment(.leading)
+                    if let reason = model.triageReason(for: item.id) {
+                        Text(reason)
+                            .font(.app(13, .medium))
+                            .foregroundStyle(Palette.accent.opacity(0.85))
+                    } else if let estimate = item.estimateLabel {
+                        Text(estimate)
+                            .font(.app(13, .medium))
+                            .foregroundStyle(Palette.textTertiary)
+                    }
+                }
+                Spacer(minLength: 0)
             }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 16)
+            .background(picked ? Palette.surface : Color.white.opacity(0.03),
+                        in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
+        .buttonStyle(.plain)
     }
 }
 
-// MARK: - 3e · Aujourd'hui
+// MARK: - Aujourd'hui
 
 struct TodayView: View {
     @Environment(AppModel.self) private var model
@@ -90,15 +129,12 @@ struct TodayView: View {
                 Spacer()
 
                 VStack(spacing: 16) {
-                    if let current = model.currentTask {
+                    if let current = model.currentPick {
                         currentCard(current)
-                        if let next = model.nextTask {
+                        if let next = model.nextPick {
                             nextRow(next)
                         }
-                        Text("C'est tout pour aujourd'hui.")
-                            .font(.app(15, .semibold))
-                            .foregroundStyle(Palette.textMuted)
-                            .padding(.top, 4)
+                        heldLine
                     } else {
                         restingNote(AdviceEngine.restingNote(model.life))
                     }
@@ -111,6 +147,28 @@ struct TodayView: View {
                     .padding(.horizontal, 28)
                     .padding(.bottom, 12)
             }
+        }
+    }
+
+    /// « Je garde N autres choses de côté » — touche pour revoir le tri.
+    @ViewBuilder
+    private var heldLine: some View {
+        let count = model.heldItems.count
+        if count > 0 {
+            Button {
+                model.startTriage()
+            } label: {
+                Text("Je garde \(count) autre\(count > 1 ? "s" : "") chose\(count > 1 ? "s" : "") de côté.")
+                    .font(.app(14, .semibold))
+                    .foregroundStyle(Palette.textMuted)
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 4)
+        } else {
+            Text("C'est tout pour aujourd'hui.")
+                .font(.app(15, .semibold))
+                .foregroundStyle(Palette.textMuted)
+                .padding(.top, 4)
         }
     }
 
@@ -139,7 +197,7 @@ struct TodayView: View {
         .padding(.horizontal, 20)
     }
 
-    private func currentCard(_ task: DayTask) -> some View {
+    private func currentCard(_ item: Item) -> some View {
         VStack(alignment: .leading, spacing: 20) {
             HStack(spacing: 10) {
                 Circle().fill(Palette.accent).frame(width: 7, height: 7)
@@ -148,7 +206,7 @@ struct TodayView: View {
                     .tracking(2)
                     .foregroundStyle(Color(hex: 0x86868C))
             }
-            Text(task.title)
+            Text(item.title)
                 .font(.app(26, .heavy))
                 .tracking(-0.65)
                 .foregroundStyle(Palette.textPrimary)
@@ -165,16 +223,16 @@ struct TodayView: View {
         )
     }
 
-    private func nextRow(_ task: DayTask) -> some View {
+    private func nextRow(_ item: Item) -> some View {
         HStack(spacing: 14) {
             Circle()
                 .stroke(Color.white.opacity(0.18), lineWidth: 2)
                 .frame(width: 22, height: 22)
             VStack(alignment: .leading, spacing: 2) {
-                Text(task.title)
+                Text(item.title)
                     .font(.app(18, .bold))
                     .foregroundStyle(Color(hex: 0xD6D6D9))
-                Text("\(task.minutes) min · ensuite")
+                Text(item.estimateLabel.map { "\($0) · ensuite" } ?? "ensuite")
                     .font(.app(14, .medium))
                     .foregroundStyle(Palette.textTertiary)
             }
@@ -186,7 +244,7 @@ struct TodayView: View {
     }
 }
 
-// MARK: - 3g · Hyperfocus
+// MARK: - Focus
 
 struct HyperfocusView: View {
     @Environment(AppModel.self) private var model
@@ -205,7 +263,7 @@ struct HyperfocusView: View {
                 HStack {
                     BackButton { model.inFocus = false }
                     Spacer()
-                    Text(model.currentTask?.title ?? "")
+                    Text(model.currentPick?.title ?? "")
                         .font(.app(13, .semibold))
                         .foregroundStyle(Palette.textGhost)
                 }
@@ -228,7 +286,7 @@ struct HyperfocusView: View {
 
                 VStack(spacing: 12) {
                     PrimaryButton(title: "C'est fait") {
-                        model.completeCurrentTask()
+                        model.completeCurrentPick()
                     }
                     HStack(spacing: 12) {
                         pillButton(running ? "Pause" : "Reprendre") { running.toggle() }
@@ -250,7 +308,6 @@ struct HyperfocusView: View {
             }
         }
         .task(id: running) {
-            // Compte à rebours en async/await, sans Combine.
             while running && remaining > 0 {
                 try? await Task.sleep(for: .seconds(1))
                 if running { remaining -= 1 }

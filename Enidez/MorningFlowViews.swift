@@ -240,8 +240,8 @@ struct AfterCoffeeView: View {
                         .fill(Palette.accent)
                         .frame(width: 8, height: 8)
 
-                    (Text("\(model.name), tu as deux choses\n")
-                        + Text("qui comptent maintenant.").foregroundColor(Palette.textSecondary))
+                    (Text("\(model.name), on regarde ce qui\n")
+                        + Text("compte aujourd'hui.").foregroundColor(Palette.textSecondary))
                         .bigTitle(36)
                         .foregroundStyle(Palette.textPrimary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -249,8 +249,8 @@ struct AfterCoffeeView: View {
 
                 Spacer()
 
-                PrimaryButton(title: "Voir lesquelles") {
-                    model.go(to: .twoThings)
+                PrimaryButton(title: "On y va") {
+                    model.startTriage()
                 }
             }
             .padding(.horizontal, 34)

@@ -81,9 +81,9 @@ struct LifeContext {
         stepsToday: 3200,
         activeEnergyToday: 180,
         bestFocusPeriod: .morning,
-        focusStreakDays: 12,
-        focusHoursThisWeek: 6.4,
-        thingsClosedThisWeek: 83,
+        focusStreakDays: 0,
+        focusHoursThisWeek: 0,
+        thingsClosedThisWeek: 0,
         lastMood: nil,
         targetBedtime: time(23, 0),
         healthConnected: false
@@ -118,15 +118,18 @@ enum AdviceEngine {
         }
     }
 
-    /// Observation d'ouverture de « Ton évolution », en deux tons.
+    /// Observation d'ouverture de l'onglet « Toi », en deux tons. La seconde
+    /// phrase n'apparaît que si on a vraiment observé un rythme.
     static func observation(_ c: LifeContext) -> (lead: String, tail: String) {
-        let tail = "Tes \(c.bestFocusPeriod.label) te réussissent mieux que \(c.bestFocusPeriod.complement)."
+        let tail = c.focusStreakDays > 0
+            ? "Tes \(c.bestFocusPeriod.label) te réussissent mieux que \(c.bestFocusPeriod.complement)."
+            : ""
         if c.lastMood == .low {
             return ("Aujourd'hui pèse un peu plus, et c'est ok.", tail)
         }
         let lead = c.focusStreakDays > 0
             ? "Tu tiens ton rythme depuis \(c.focusStreakDays) jours."
-            : "On repart ensemble, à ton rythme."
+            : "On apprend à se connaître. Encore quelques jours."
         return (lead, tail)
     }
 
@@ -145,9 +148,13 @@ enum AdviceEngine {
         return "Garde ce rythme. Ce que tu fais en ce moment te réussit."
     }
 
-    /// La ligne de chiffres, reléguée en fin d'écran, en petit.
-    static func summaryLine(_ c: LifeContext) -> String {
-        "\(hours(c.focusHoursThisWeek)) de focus cette semaine · \(c.thingsClosedThisWeek) choses closes"
+    /// La ligne de chiffres, reléguée en fin d'écran, en petit. Vrais compteurs.
+    static func summaryLine(closedThisWeek: Int) -> String {
+        switch closedThisWeek {
+        case 0:  return "Rien de bouclé cette semaine pour l'instant."
+        case 1:  return "1 chose bouclée cette semaine."
+        default: return "\(closedThisWeek) choses bouclées cette semaine."
+        }
     }
 
     /// Ce qu'on montre quand la journée est faite : une phrase pour toi, une
