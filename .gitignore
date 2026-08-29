@@ -21,6 +21,9 @@ xcuserdata/
 Pods/
 Carthage/Build/
 
+# Claude Code (réglages perso machine-local)
+.claude/settings.local.json
+
 # Divers
 *.hmap
 *.ipa
