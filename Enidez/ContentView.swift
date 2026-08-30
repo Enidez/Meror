@@ -39,7 +39,11 @@ struct ContentView: View {
             await model.loadHealthData()
         }
         .onChange(of: scenePhase, initial: true) { _, phase in
-            if phase == .active { model.checkForEvening() }
+            switch phase {
+            case .active:     model.checkForEvening()
+            case .background: model.refreshMiddayNudge()
+            default:          break
+            }
         }
     }
 

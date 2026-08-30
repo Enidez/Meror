@@ -103,7 +103,10 @@ final class AppModel {
             guard isReady, remindersOn != oldValue else { return }
             if remindersOn {
                 let (h, m) = eveningReminderTime
-                Task { await Reminders.enable(eveningHour: h, eveningMinute: m) }
+                Task {
+                    await Reminders.enable(eveningHour: h, eveningMinute: m)
+                    refreshMiddayNudge()
+                }
             } else {
                 Reminders.disable()
             }
@@ -162,6 +165,46 @@ final class AppModel {
         return (c.hour ?? 21, c.minute ?? 30)
     }
 
+    /// L'heure du mot du milieu, calée sur le moment où la personne dit tenir
+    /// le mieux : juste après sa fenêtre si c'est le matin, juste avant sinon.
+    var middayReminderHour: Int {
+        switch energyMoment {
+        case .morning:   12
+        case .afternoon: 13
+        case .evening:   16
+        default:         14
+        }
+    }
+
+    /// Ce qu'on aurait à dire en milieu de journée — ou `nil` pour se taire.
+    /// L'ordre compte : ce qui est utile passe avant ce qui est gentil.
+    var middayNudge: Nudge? {
+        guard isOnboarded else { return nil }
+
+        // Une échéance demain qu'on n'a pas prise aujourd'hui : c'est le plus
+        // utile qu'on puisse dire.
+        let cal = Calendar.current
+        if let soon = items.first(where: { item in
+            guard item.isOpen, !item.isPickedToday, let due = item.due else { return false }
+            return cal.isDateInTomorrow(due)
+        }) {
+            return .deadlineTomorrow(soon.title)
+        }
+
+        let picks = pickedToday
+        if picks.isEmpty {
+            // Rien de choisi, mais il faut avoir de quoi choisir.
+            return items.contains(where: \.isOpen) ? .nothingPicked : nil
+        }
+
+        let open = picks.filter(\.isOpen)
+        switch open.count {
+        case 0:  return .bothDone
+        case 1 where picks.count > 1: return .oneLeft(open[0].title.lowercased())
+        default: return .notStarted(open[0].title)
+        }
+    }
+
     /// Nombre de choses bouclées cette semaine (vrai compteur).
     var closedThisWeek: Int {
         let cal = Calendar.current
@@ -178,7 +221,10 @@ final class AppModel {
         // Repose les rappels au cas où l'heure de coucher a changé.
         if remindersOn {
             let (h, m) = eveningReminderTime
-            Task { await Reminders.enable(eveningHour: h, eveningMinute: m) }
+            Task {
+                await Reminders.enable(eveningHour: h, eveningMinute: m)
+                refreshMiddayNudge()
+            }
         }
     }
 
@@ -272,6 +318,19 @@ final class AppModel {
     func snoozeEvening() {
         eveningSnoozed = true
         withAnimation(.easeInOut(duration: 0.3)) { screen = .app }
+    }
+
+    // MARK: - Le mot du milieu de journée
+
+    /// Repose le mot du milieu d'après l'état du moment. Appelé quand l'app
+    /// passe en arrière-plan : le contenu colle ainsi toujours à la journée.
+    /// S'il n'y a rien d'utile à dire, on ne sonne pas.
+    func refreshMiddayNudge() {
+        guard remindersOn else {
+            Reminders.scheduleMidday(nil, hour: 0, minute: 0)
+            return
+        }
+        Reminders.scheduleMidday(middayNudge, hour: middayReminderHour, minute: 0)
     }
 
     /// Referme la journée. Ce qui n'est pas fini repart dans le tri de demain

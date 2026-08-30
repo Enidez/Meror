@@ -146,6 +146,26 @@ struct YouView: View {
                     .tint(Palette.accent)
             }
 
+            if model.remindersOn {
+                Divider().overlay(Palette.separator)
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("EN MILIEU DE JOURNÉE")
+                        .font(.app(11, .bold))
+                        .tracking(1.6)
+                        .foregroundStyle(Palette.textGhost)
+                    if let nudge = model.middayNudge {
+                        Text(nudge.body)
+                            .font(.app(15, .medium))
+                            .foregroundStyle(Color(hex: 0xD6D6D9))
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        Text("Rien à te dire pour l'instant. Je me tais.")
+                            .font(.app(15, .medium))
+                            .foregroundStyle(Palette.textTertiary)
+                    }
+                }
+            }
+
             if !model.pickedToday.isEmpty
                 && !Calendar.current.isDateInToday(model.eveningDoneOn ?? .distantPast) {
                 Divider().overlay(Palette.separator)
