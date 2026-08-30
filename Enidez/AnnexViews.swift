@@ -17,6 +17,7 @@ struct UpcomingView: View {
     @State private var monthAnchor = Date()
     /// Le jour touché, ou `nil` pour la liste de ce qui arrive.
     @State private var selectedDay: Date?
+    @State private var showNewProject = false
 
     private let weekDays = ["L", "M", "M", "J", "V", "S", "D"]
     private var cal: Calendar { Calendar.current }
@@ -44,6 +45,9 @@ struct UpcomingView: View {
                     .padding(.bottom, 44)   // dégage la barre d'onglets flottante
             }
         }
+        .sheet(isPresented: $showNewProject) {
+            NewProjectView().environment(model)
+        }
         // Ce qu'on vient d'ajouter doit se voir : on va le chercher là où il
         // est tombé, même si c'est un autre mois.
         .onChange(of: model.lastCaptured?.id) { _, _ in
@@ -61,6 +65,15 @@ struct UpcomingView: View {
         HStack(spacing: 0) {
             Text("À venir").bigTitle(30).foregroundStyle(Palette.textPrimary)
             Spacer()
+            Button { showNewProject = true } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(Palette.textMuted)
+                    .frame(width: 32, height: 32)
+                    .background(Palette.surface, in: Circle())
+            }
+            .buttonStyle(.plain)
+            .padding(.trailing, 10)
             arrow("chevron.left") { shiftMonth(-1) }
             Text(monthLabel)
                 .font(.app(15, .semibold))
@@ -184,10 +197,28 @@ struct UpcomingView: View {
     }
 
     @ViewBuilder
+    private var projectsSection: some View {
+        if selectedDay == nil && !model.activeProjects.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("EN COURS")
+                    .font(.app(12, .bold))
+                    .tracking(2)
+                    .foregroundStyle(Palette.textGhost)
+                    .padding(.bottom, 2)
+                ForEach(model.activeProjects) { project in
+                    ProjectRow(project: project)
+                }
+            }
+            .padding(.bottom, 28)
+        }
+    }
+
+    @ViewBuilder
     private var list: some View {
         let shown = selectedDay.map(items(on:)) ?? upcoming
 
         VStack(alignment: .leading, spacing: 0) {
+            projectsSection
             Text(selectedDay.map(longDay) ?? "PROCHAINEMENT")
                 .font(.app(12, .bold))
                 .tracking(2)

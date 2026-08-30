@@ -50,6 +50,23 @@ enum GoodDay: String, Codable, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+/// Un projet : une chose trop grosse pour tenir dans une journée. On ne la
+/// regarde jamais en entier — l'app n'en sort qu'une marche à la fois.
+///
+/// C'est la réponse au blocage devant le bloc : ce n'est pas la volonté qui
+/// manque, c'est que rien n'est assez petit pour être commencé.
+struct Project: Identifiable, Codable {
+    var id = UUID()
+    var title: String
+    /// Pour qui, ou pourquoi. Ce qu'on se rappelle quand on n'a plus envie.
+    var why: String = ""
+    var due: Date?
+    var createdAt = Date()
+    var archivedAt: Date?
+
+    var isActive: Bool { archivedAt == nil }
+}
+
 /// Une chose à faire. Peut être estimée, datée, faite, ou choisie pour un jour.
 struct Item: Identifiable, Codable {
     var id = UUID()
@@ -60,6 +77,10 @@ struct Item: Identifiable, Codable {
     var doneAt: Date?          // nil = à faire
     var pickedOn: Date?        // dernier jour où c'était une des deux
     var deferrals = 0          // nombre de fois écartée du jour à la main
+    /// Le projet dont cette chose est une marche, s'il y en a un.
+    var projectID: UUID?
+    /// Rang de la marche dans son projet : on les propose dans l'ordre.
+    var step: Int = 0
 
     var isOpen: Bool { doneAt == nil }
 
@@ -107,26 +128,68 @@ enum Planner {
 
     /// Les deux meilleures candidates parmi le backlog ouvert non choisi.
     /// `struggle` incline légèrement le tri vers ce qui aide cette personne.
+    ///
+    /// D'un projet, on ne propose **que sa marche suivante** : les autres sont
+    /// écartées d'office. C'est ce qui empêche de se retrouver devant le bloc.
     static func suggestions(from items: [Item],
+                            projects: [Project] = [],
                             struggle: DailyStruggle? = nil,
                             on day: Date = Date()) -> [Suggestion] {
-        let pool = items.filter { $0.isOpen && !$0.isPickedToday }
+        let byID = Dictionary(uniqueKeysWithValues: projects.map { ($0.id, $0) })
+        let pool = items
+            .filter { $0.isOpen && !$0.isPickedToday }
+            .filter { item in
+                guard let pid = item.projectID else { return true }
+                guard byID[pid]?.isActive == true else { return false }
+                return Planner.nextStep(of: pid, in: items)?.id == item.id
+            }
         let ranked = pool
-            .map { (item: $0, score: score($0, struggle: struggle, on: day)) }
+            .map { (item: $0, score: score($0, project: $0.projectID.flatMap { byID[$0] },
+                                           struggle: struggle, on: day)) }
             .sorted { $0.score > $1.score }
             .prefix(2)
-        return ranked.map { Suggestion(item: $0.item, reason: reason(for: $0.item, on: day)) }
+        return ranked.map {
+            Suggestion(item: $0.item,
+                       reason: reason(for: $0.item,
+                                      project: $0.item.projectID.flatMap { byID[$0] },
+                                      on: day))
+        }
+    }
+
+    /// La première marche encore ouverte d'un projet, dans l'ordre.
+    static func nextStep(of projectID: UUID, in items: [Item]) -> Item? {
+        items.filter { $0.projectID == projectID && $0.isOpen }
+            .min { $0.step < $1.step }
+    }
+
+    /// Où en est un projet : marches faites sur marches totales.
+    static func progress(of projectID: UUID, in items: [Item]) -> (done: Int, total: Int) {
+        let steps = items.filter { $0.projectID == projectID }
+        return (steps.filter { !$0.isOpen }.count, steps.count)
     }
 
     // MARK: - Score
 
-    private static func score(_ item: Item, struggle: DailyStruggle?, on day: Date) -> Double {
+    private static func score(_ item: Item, project: Project?,
+                              struggle: DailyStruggle?, on day: Date) -> Double {
         var s = 0.0
         let cal = Calendar.current
 
         // Ancienneté : ce qui traîne remonte, doucement, plafonné.
         let age = cal.dateComponents([.day], from: item.createdAt, to: day).day ?? 0
         s += min(Double(max(age, 0)), 14) * 1.5
+
+        // Une marche de projet compte double : c'est ce qui n'avance jamais
+        // tout seul, et c'est là que se joue la promesse tenue.
+        if project != nil { s += 18 }
+
+        // L'échéance du projet pèse comme celle de la marche.
+        if let pdue = project?.due {
+            let days = cal.dateComponents([.day], from: day, to: pdue).day ?? 99
+            if days <= 2 { s += 55 }
+            else if days <= 7 { s += 30 }
+            else if days <= 14 { s += 14 }
+        }
 
         // Échéance proche : gros poids si c'est dans les trois jours.
         if let due = item.due {
@@ -153,8 +216,24 @@ enum Planner {
         return s
     }
 
-    private static func reason(for item: Item, on day: Date) -> String {
+    private static func reason(for item: Item, project: Project?, on day: Date) -> String {
         let cal = Calendar.current
+
+        // Nommer le projet : la marche cesse d'être une corvée isolée, elle
+        // redevient un pas vers quelque chose qu'on a promis.
+        if let project {
+            if let pdue = project.due {
+                let days = cal.dateComponents([.day], from: cal.startOfDay(for: day),
+                                              to: cal.startOfDay(for: pdue)).day ?? 99
+                switch days {
+                case ..<0:   return "\(project.title) — en retard"
+                case 0...2:  return "\(project.title) — plus que \(days == 0 ? "aujourd'hui" : "\(days) j")"
+                case 3...14: return "\(project.title) — dans \(days) jours"
+                default:     break
+                }
+            }
+            return "prochaine marche · \(project.title)"
+        }
 
         if let due = item.due {
             let days = cal.dateComponents([.day], from: cal.startOfDay(for: day),

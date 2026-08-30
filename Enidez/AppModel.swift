@@ -106,6 +106,9 @@ final class AppModel {
     /// deux choses au plus sont « choisies » pour le jour.
     var items: [Item] = Item.starter { didSet { persist() } }
 
+    /// Les projets en cours : les choses trop grosses pour une journée.
+    var projects: [Project] = [] { didSet { persist() } }
+
     /// Sélection en cours sur l'écran de tri (max 2).
     var triagePicks: [UUID] = []
 
@@ -228,6 +231,7 @@ final class AppModel {
         if let period = saved.energyMoment?.period { life.selfReportedPeriod = period }
         tab = saved.tab
         items = saved.items
+        projects = saved.projects ?? []
         capturedThoughts = saved.capturedThoughts
         dayNotes = saved.dayNotes ?? []
         eveningDoneOn = saved.eveningDoneOn
@@ -243,7 +247,7 @@ final class AppModel {
         }
 
         if screen == .triage {
-            triagePicks = Planner.suggestions(from: items, struggle: dailyStruggle).map(\.item.id)
+            triagePicks = Planner.suggestions(from: items, projects: projects, struggle: dailyStruggle).map(\.item.id)
         }
     }
 
@@ -258,6 +262,7 @@ final class AppModel {
             screen: screen,
             tab: tab,
             items: items,
+            projects: projects,
             capturedThoughts: capturedThoughts,
             dayNotes: dayNotes,
             eveningDoneOn: eveningDoneOn,
@@ -285,6 +290,52 @@ final class AppModel {
         isOnboarded = true
         remindersOn = true   // deux rappels par jour : matin, soir
         go(to: .wakeUp)
+    }
+
+    // MARK: - Projets
+
+    /// Les projets actifs, le plus urgent d'abord.
+    var activeProjects: [Project] {
+        projects.filter(\.isActive)
+            .sorted { ($0.due ?? .distantFuture) < ($1.due ?? .distantFuture) }
+    }
+
+    /// Crée un projet et ses marches. Une marche par ligne, dans l'ordre.
+    /// C'est le découpage qui débloque : on n'attaque jamais le bloc entier.
+    @discardableResult
+    func addProject(title: String, why: String = "", due: Date?, steps: [String]) -> Project {
+        let project = Project(title: title.trimmingCharacters(in: .whitespacesAndNewlines),
+                              why: why.trimmingCharacters(in: .whitespacesAndNewlines),
+                              due: due)
+        projects.append(project)
+        let cleaned = steps
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        for (index, step) in cleaned.enumerated() {
+            items.append(Item(title: step, projectID: project.id, step: index))
+        }
+        return project
+    }
+
+    /// Ajoute une marche à la fin d'un projet.
+    func addStep(_ title: String, to projectID: UUID) {
+        let next = (items.filter { $0.projectID == projectID }.map(\.step).max() ?? -1) + 1
+        items.append(Item(title: title, projectID: projectID, step: next))
+    }
+
+    /// La marche suivante d'un projet — la seule qu'on montre jamais.
+    func nextStep(of project: Project) -> Item? {
+        Planner.nextStep(of: project.id, in: items)
+    }
+
+    func progress(of project: Project) -> (done: Int, total: Int) {
+        Planner.progress(of: project.id, in: items)
+    }
+
+    /// Range un projet terminé (ou abandonné) sans effacer son histoire.
+    func archive(_ project: Project) {
+        guard let index = projects.firstIndex(where: { $0.id == project.id }) else { return }
+        projects[index].archivedAt = Date()
     }
 
     // MARK: - Bilan du soir
@@ -360,6 +411,7 @@ final class AppModel {
         remindersOn = false
         Reminders.disable()
         items = Item.starter
+        projects = []
         triagePicks = []
         withAnimation(.easeInOut(duration: 0.4)) { screen = .welcome }
     }
@@ -388,13 +440,13 @@ final class AppModel {
 
     /// Ouvre l'écran de tri, pré-rempli des deux suggestions.
     func startTriage() {
-        triagePicks = Planner.suggestions(from: items, struggle: dailyStruggle).map(\.item.id)
+        triagePicks = Planner.suggestions(from: items, projects: projects, struggle: dailyStruggle).map(\.item.id)
         go(to: .triage)
     }
 
     /// La raison affichée sous une suggestion, s'il y en a une.
     func triageReason(for id: UUID) -> String? {
-        Planner.suggestions(from: items, struggle: dailyStruggle).first { $0.item.id == id }?.reason
+        Planner.suggestions(from: items, projects: projects, struggle: dailyStruggle).first { $0.item.id == id }?.reason
     }
 
     /// Coche / décoche une chose pour aujourd'hui (deux au maximum).
@@ -408,7 +460,7 @@ final class AppModel {
 
     /// Fige la sélection du jour et entre dans l'app.
     func confirmTriage() {
-        let suggested = Set(Planner.suggestions(from: items, struggle: dailyStruggle).map(\.item.id))
+        let suggested = Set(Planner.suggestions(from: items, projects: projects, struggle: dailyStruggle).map(\.item.id))
         let now = Date()
         for index in items.indices where items[index].isOpen {
             let id = items[index].id

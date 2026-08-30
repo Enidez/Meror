@@ -22,6 +22,7 @@ struct StoredState: Codable {
     var screen: Screen
     var tab: AppTab
     var items: [Item]
+    var projects: [Project]?
     var capturedThoughts: [String]
     var dayNotes: [DayNote]?
     var eveningDoneOn: Date?
