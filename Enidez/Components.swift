@@ -218,6 +218,20 @@ struct CaptureField: View {
     }
 }
 
+/// Micro + bulle, côte à côte. La forme minimale pour donner quelque chose à
+/// l'assistant : on parle, ou on écrit. Rien à lire, rien à remplir.
+struct CaptureButtons: View {
+    @Environment(AppModel.self) private var model
+    var size: CGFloat = 54
+
+    var body: some View {
+        HStack(spacing: 14) {
+            MicButton(size: size) { model.isListening = true }
+            WriteButton(size: size) { model.isWriting = true }
+        }
+    }
+}
+
 // MARK: - Retour d'écoute du micro
 
 /// Voile d'écoute affiché quand l'assistant capte la voix. On peut toujours

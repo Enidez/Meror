@@ -27,24 +27,28 @@ struct UpcomingView: View {
             VStack(spacing: 0) {
                 header
 
-                calendar
-                    .padding(.horizontal, 28)
-                    .padding(.bottom, 14)
-
-                Divider().overlay(Palette.separator).padding(.horizontal, 28)
-
+                // Les engagements les plus lourds d'abord ; le calendrier
+                // n'est qu'une seconde lecture des mêmes dates.
                 ScrollView(showsIndicators: false) {
-                    list
-                        .padding(.horizontal, 28)
-                        .padding(.top, 14)
+                    VStack(spacing: 0) {
+                        projectsSection
+                        calendar
+                            .padding(.bottom, 16)
+                        Divider().overlay(Palette.separator)
+                        list.padding(.top, 16)
+                    }
+                    .padding(.horizontal, 28)
+                    .padding(.bottom, 24)   // que la dernière ligne ne passe pas sous les boutons
                 }
 
-                CaptureField(placeholder: capturePlaceholder, dueDay: selectedDay)
-                    .padding(.horizontal, 28)
-                    .padding(.top, 10)
+                CaptureButtons()
+                    .padding(.top, 4)
                     .padding(.bottom, 44)   // dégage la barre d'onglets flottante
             }
         }
+        .onAppear { model.pendingDueDay = selectedDay }
+        .onChange(of: selectedDay) { _, day in model.pendingDueDay = day }
+        .onDisappear { model.pendingDueDay = nil }
         .sheet(isPresented: $showNewProject) {
             NewProjectView().environment(model)
         }
@@ -62,29 +66,46 @@ struct UpcomingView: View {
     // MARK: - En-tête et navigation
 
     private var header: some View {
-        HStack(spacing: 0) {
+        HStack {
             Text("À venir").bigTitle(30).foregroundStyle(Palette.textPrimary)
             Spacer()
-            Button { showNewProject = true } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(Palette.textMuted)
-                    .frame(width: 32, height: 32)
-                    .background(Palette.surface, in: Circle())
-            }
-            .buttonStyle(.plain)
-            .padding(.trailing, 10)
-            arrow("chevron.left") { shiftMonth(-1) }
-            Text(monthLabel)
-                .font(.app(15, .semibold))
-                .foregroundStyle(Palette.textSecondary)
-                .frame(minWidth: 104)
-                .contentTransition(.opacity)
-            arrow("chevron.right") { shiftMonth(1) }
+            newProjectButton
         }
         .padding(.horizontal, 28)
         .padding(.top, 24)
         .padding(.bottom, 18)
+    }
+
+    /// Un « + » seul ne dit pas ce qu'il crée. On nomme la chose.
+    private var newProjectButton: some View {
+        Button { showNewProject = true } label: {
+            HStack(spacing: 7) {
+                Image(systemName: "square.stack.3d.up")
+                    .font(.system(size: 13, weight: .semibold))
+                Text("Projet")
+                    .font(.app(14, .semibold))
+            }
+            .foregroundStyle(Palette.sand)
+            .padding(.horizontal, 14)
+            .frame(height: 34)
+            .background(Palette.surface, in: Capsule())
+            .overlay(Capsule().stroke(Palette.hairline, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Le mois affiché, avec ses flèches — au-dessus de la grille.
+    private var monthBar: some View {
+        HStack {
+            Text(monthLabel)
+                .font(.app(15, .semibold))
+                .foregroundStyle(Palette.textSecondary)
+                .contentTransition(.opacity)
+            Spacer()
+            arrow("chevron.left") { shiftMonth(-1) }
+            arrow("chevron.right") { shiftMonth(1) }
+        }
+        .padding(.bottom, 12)
     }
 
     private func arrow(_ icon: String, action: @escaping () -> Void) -> some View {
@@ -123,6 +144,13 @@ struct UpcomingView: View {
     }
 
     private var calendar: some View {
+        VStack(spacing: 0) {
+            monthBar
+            grid
+        }
+    }
+
+    private var grid: some View {
         let columns = Array(repeating: GridItem(.flexible(), spacing: 6), count: 7)
         return LazyVGrid(columns: columns, spacing: 6) {
             ForEach(Array(weekDays.enumerated()), id: \.offset) { _, label in
@@ -198,17 +226,18 @@ struct UpcomingView: View {
 
     @ViewBuilder
     private var projectsSection: some View {
-        if selectedDay == nil && !model.activeProjects.isEmpty {
+        if !model.activeProjects.isEmpty {
             VStack(alignment: .leading, spacing: 10) {
                 Text("EN COURS")
                     .font(.app(12, .bold))
                     .tracking(2)
-                    .foregroundStyle(Palette.textGhost)
+                    .foregroundStyle(Palette.sandGhost)
                     .padding(.bottom, 2)
                 ForEach(model.activeProjects) { project in
                     ProjectRow(project: project)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.bottom, 28)
         }
     }
@@ -218,7 +247,6 @@ struct UpcomingView: View {
         let shown = selectedDay.map(items(on:)) ?? upcoming
 
         VStack(alignment: .leading, spacing: 0) {
-            projectsSection
             Text(selectedDay.map(longDay) ?? "PROCHAINEMENT")
                 .font(.app(12, .bold))
                 .tracking(2)
@@ -301,9 +329,4 @@ struct UpcomingView: View {
         return f.string(from: day).uppercased()
     }
 
-    private var capturePlaceholder: String {
-        selectedDay == nil
-            ? "« Jeudi, dentiste » — écris ou dicte"
-            : "Ajoute à ce jour — écris ou dicte"
-    }
 }

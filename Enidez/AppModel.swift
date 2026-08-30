@@ -116,6 +116,10 @@ final class AppModel {
     /// Transitoire : on ne la garde pas d'un lancement à l'autre.
     private(set) var lastCaptured: Item?
 
+    /// Le jour choisi dans le calendrier, s'il y en a un : ce qu'on dicte ou
+    /// écrit s'y rattache. Transitoire.
+    var pendingDueDay: Date?
+
     /// Accès à Apple Santé et au micro.
     private let health = HealthService()
     let speech = SpeechService()
@@ -521,7 +525,7 @@ final class AppModel {
         var item = VoiceInterpreter.item(from: phrase)
 
         // Un jour choisi dans le calendrier l'emporte sur la date devinée.
-        if let day {
+        if let day = day ?? (tab == .upcoming ? pendingDueDay : nil) {
             item.due = Calendar.current.date(bySettingHour: 12, minute: 0, second: 0, of: day) ?? day
         }
 

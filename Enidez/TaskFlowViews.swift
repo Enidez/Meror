@@ -143,9 +143,8 @@ struct TodayView: View {
 
                 Spacer()
 
-                CaptureField(placeholder: "Écris ou dicte une chose à faire")
-                    .padding(.horizontal, 28)
-                    .padding(.bottom, 12)
+                CaptureButtons()
+                    .padding(.bottom, 20)
             }
         }
     }
