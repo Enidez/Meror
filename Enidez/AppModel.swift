@@ -34,22 +34,6 @@ enum AppTab: String, Codable, CaseIterable {
     case you
 }
 
-/// Une échéance à venir (le calendrier). Sera fondu dans `Item` plus tard.
-struct Deadline: Identifiable, Codable {
-    var id = UUID()
-    var day: String       // « MER 19 »
-    var title: String
-    var hasAccent: Bool = false
-
-    static var starter: [Deadline] {
-        [
-            Deadline(day: "MER 19", title: "Dossier mutuelle", hasAccent: true),
-            Deadline(day: "VEN 21", title: "Rendez-vous kiné"),
-            Deadline(day: "LUN 24", title: "Courses de la semaine")
-        ]
-    }
-}
-
 @MainActor
 @Observable
 final class AppModel {
@@ -121,9 +105,6 @@ final class AppModel {
     /// Tout ce que tu as à faire. Le backlog. La plupart est gardée de côté ;
     /// deux choses au plus sont « choisies » pour le jour.
     var items: [Item] = Item.starter { didSet { persist() } }
-
-    /// Les échéances datées (onglet À venir).
-    var deadlines: [Deadline] = Deadline.starter { didSet { persist() } }
 
     /// Sélection en cours sur l'écran de tri (max 2).
     var triagePicks: [UUID] = []
@@ -243,7 +224,6 @@ final class AppModel {
         if let period = saved.energyMoment?.period { life.selfReportedPeriod = period }
         tab = saved.tab
         items = saved.items
-        deadlines = saved.deadlines
         capturedThoughts = saved.capturedThoughts
         dayNotes = saved.dayNotes ?? []
         eveningDoneOn = saved.eveningDoneOn
@@ -274,7 +254,6 @@ final class AppModel {
             screen: screen,
             tab: tab,
             items: items,
-            deadlines: deadlines,
             capturedThoughts: capturedThoughts,
             dayNotes: dayNotes,
             eveningDoneOn: eveningDoneOn,
@@ -377,7 +356,6 @@ final class AppModel {
         remindersOn = false
         Reminders.disable()
         items = Item.starter
-        deadlines = Deadline.starter
         triagePicks = []
         withAnimation(.easeInOut(duration: 0.4)) { screen = .welcome }
     }
@@ -469,12 +447,13 @@ final class AppModel {
 
     // MARK: - Saisie (écrite ou dictée)
 
-    /// Porte d'entrée commune au clavier et à la voix.
-    func capture(_ text: String) {
-        interpret(text)
+    /// Porte d'entrée commune au clavier et à la voix. `day` force l'échéance
+    /// (utile quand on ajoute depuis un jour choisi dans le calendrier).
+    func capture(_ text: String, on day: Date? = nil) {
+        interpret(text, on: day)
     }
 
-    private func interpret(_ phrase: String) {
+    private func interpret(_ phrase: String, on day: Date? = nil) {
         let phrase = phrase.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !phrase.isEmpty else { return }
 
@@ -483,12 +462,12 @@ final class AppModel {
             return
         }
 
-        if screen == .app && tab == .upcoming {
-            deadlines.append(VoiceInterpreter.deadline(from: phrase))
-            return
-        }
-
         var item = VoiceInterpreter.item(from: phrase)
+
+        // Un jour choisi dans le calendrier l'emporte sur la date devinée.
+        if let day {
+            item.due = Calendar.current.date(bySettingHour: 12, minute: 0, second: 0, of: day) ?? day
+        }
 
         if screen == .triage {
             items.append(item)
@@ -496,7 +475,8 @@ final class AppModel {
             return
         }
 
-        // Dans l'app : s'il reste de la place dans les deux, ça en devient une.
+        // Sur « Aujourd'hui » : s'il reste de la place dans les deux, ça en
+        // devient une. Ailleurs (« À venir »), ça rejoint simplement la liste.
         if screen == .app && tab == .today && todayPicks.count < 2 {
             item.pickedOn = Date()
         }

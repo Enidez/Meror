@@ -85,6 +85,12 @@ struct Item: Identifiable, Codable {
             Item(title: "Prendre rendez-vous chez le dentiste",
                  createdAt: now.addingTimeInterval(-6 * day)),
             Item(title: "Ranger le bureau", minutes: 20,
+                 createdAt: now.addingTimeInterval(-2 * day)),
+            Item(title: "Dossier mutuelle",
+                 due: now.addingTimeInterval(2 * day),
+                 createdAt: now.addingTimeInterval(-4 * day)),
+            Item(title: "Rendez-vous kiné",
+                 due: now.addingTimeInterval(5 * day),
                  createdAt: now.addingTimeInterval(-2 * day))
         ]
     }

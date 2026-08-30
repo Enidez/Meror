@@ -163,6 +163,8 @@ struct BackButton: View {
 /// à la voix. La voix reste là (icône micro), mais on n'y est jamais obligé.
 struct CaptureField: View {
     var placeholder: String
+    /// Jour auquel rattacher ce qui est saisi (calendrier).
+    var dueDay: Date? = nil
 
     @Environment(AppModel.self) private var model
     @State private var text = ""
@@ -212,7 +214,7 @@ struct CaptureField: View {
         text = ""
         focused = false
         guard !value.isEmpty else { return }
-        model.capture(value)
+        model.capture(value, on: dueDay)
     }
 }
 

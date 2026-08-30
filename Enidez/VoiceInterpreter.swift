@@ -34,12 +34,6 @@ enum VoiceInterpreter {
                     due: due)
     }
 
-    /// Pour l'onglet À venir tant qu'il vit encore sur `Deadline`.
-    static func deadline(from phrase: String) -> Deadline {
-        let it = item(from: phrase)
-        return Deadline(day: it.due.map(shortLabel) ?? "BIENTÔT", title: it.title)
-    }
-
     // MARK: - Date
 
     private static func firstDate(in phrase: String) -> (Date, Range<String.Index>)? {

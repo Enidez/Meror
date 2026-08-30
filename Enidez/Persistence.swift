@@ -22,7 +22,6 @@ struct StoredState: Codable {
     var screen: Screen
     var tab: AppTab
     var items: [Item]
-    var deadlines: [Deadline]
     var capturedThoughts: [String]
     var dayNotes: [DayNote]?
     var eveningDoneOn: Date?
@@ -33,12 +32,27 @@ struct StoredState: Codable {
 }
 
 enum Store {
-    private static let key = "enidez.state.v5"
+    private static let key = "enidez.state.v6"
+    /// Formats précédents, du plus récent au plus ancien. On les relit avec la
+    /// forme actuelle : les clés disparues (les anciennes « deadlines ») sont
+    /// simplement ignorées, le reste est préservé.
+    private static let legacyKeys = ["enidez.state.v5", "enidez.state.v4"]
 
     /// Relit l'état sauvegardé, ou `nil` s'il n'y en a pas (ou s'il est illisible).
     static func load() -> StoredState? {
-        guard let data = UserDefaults.standard.data(forKey: key) else { return nil }
-        return try? JSONDecoder().decode(StoredState.self, from: data)
+        let decoder = JSONDecoder()
+        if let data = UserDefaults.standard.data(forKey: key),
+           let state = try? decoder.decode(StoredState.self, from: data) {
+            return state
+        }
+        for old in legacyKeys {
+            if let data = UserDefaults.standard.data(forKey: old),
+               let state = try? decoder.decode(StoredState.self, from: data) {
+                UserDefaults.standard.removeObject(forKey: old)
+                return state
+            }
+        }
+        return nil
     }
 
     /// Écrit l'état. Silencieux en cas d'échec : une sauvegarde ratée ne doit
@@ -49,6 +63,8 @@ enum Store {
     }
 
     static func clear() {
-        UserDefaults.standard.removeObject(forKey: key)
+        for k in [key] + legacyKeys {
+            UserDefaults.standard.removeObject(forKey: k)
+        }
     }
 }
