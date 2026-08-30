@@ -297,14 +297,9 @@ struct HyperfocusView: View {
 
                 Spacer()
 
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Une pensée parasite ? Note-la, je la garde.")
-                        .font(.app(14, .medium))
-                        .foregroundStyle(Palette.textTertiary)
-                    CaptureField(placeholder: "Écris ou dicte la pensée")
-                }
-                .padding(.horizontal, 32)
-                .padding(.bottom, 12)
+                // Rien d'autre : une pensée parasite se confie d'un geste.
+                MicButton { model.isListening = true }
+                    .padding(.bottom, 28)
             }
         }
         .task(id: running) {

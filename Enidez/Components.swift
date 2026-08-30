@@ -197,22 +197,27 @@ struct CaptureField: View {
 
 // MARK: - Retour d'écoute du micro
 
-/// Voile d'écoute affiché quand l'assistant capte la voix.
+/// Voile d'écoute affiché quand l'assistant capte la voix. On peut toujours
+/// basculer au clavier : parler n'est pas toujours possible.
 struct ListeningOverlay: View {
     var name: String
     var transcript: String = ""
     var status: SpeechService.Status = .listening
     var onDone: () -> Void
+    var onWrite: (String) -> Void = { _ in }
 
     @State private var pulse = false
+    @State private var writing = false
+    @State private var typed = ""
+    @FocusState private var fieldFocused: Bool
 
     /// Message sous le titre : le texte en cours, ou un repli si la dictée
     /// n'est pas disponible.
     private var hint: String {
         if !transcript.isEmpty { return transcript }
         switch status {
-        case .denied:      return "Micro refusé. Réglages → Enidez pour l'autoriser."
-        case .unavailable: return "La dictée n'est pas disponible ici. Note au doigt."
+        case .denied:      return "Micro refusé. Réglages → Meror pour l'autoriser."
+        case .unavailable: return "La dictée n'est pas disponible ici. Écris plutôt."
         default:           return "Parle, je note."
         }
     }
@@ -221,48 +226,112 @@ struct ListeningOverlay: View {
         ZStack {
             Color.black.opacity(0.72).ignoresSafeArea()
 
-            VStack(spacing: 32) {
-                Circle()
-                    .fill(Palette.accent)
-                    .frame(width: 14, height: 14)
-                    .scaleEffect(pulse ? 2.4 : 1)
-                    .opacity(pulse ? 0.15 : 1)
-                    .overlay(
-                        Circle().fill(Palette.accent).frame(width: 14, height: 14)
-                    )
-                    .animation(.easeInOut(duration: 1).repeatForever(autoreverses: true), value: pulse)
-
-                Text("Je t'écoute, \(name).")
-                    .font(.app(24, .bold))
-                    .tracking(-0.5)
-                    .foregroundStyle(Palette.textPrimary)
-
-                Text(hint)
-                    .font(.app(transcript.isEmpty ? 16 : 20, transcript.isEmpty ? .medium : .semibold))
-                    .foregroundStyle(transcript.isEmpty ? Palette.textTertiary : Palette.textSecondary)
-                    .multilineTextAlignment(.center)
-                    .lineSpacing(4)
-                    .padding(.horizontal, 40)
-                    .animation(.easeOut(duration: 0.15), value: transcript)
-            }
-            .padding(.bottom, 40)
+            if writing { writePane } else { listenPane }
 
             VStack {
                 Spacer()
+                if writing {
+                    Button(action: send) {
+                        Text("Envoyer")
+                            .font(.app(16, .bold))
+                            .foregroundStyle(.black)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 54)
+                            .background(Palette.accent, in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(typed.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .opacity(typed.trimmingCharacters(in: .whitespaces).isEmpty ? 0.4 : 1)
+                } else {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) { writing = true }
+                        fieldFocused = true
+                    } label: {
+                        Text("Écrire plutôt")
+                            .font(.app(15, .semibold))
+                            .foregroundStyle(Palette.textMuted)
+                            .padding(.vertical, 10)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.plain)
+                }
+
                 Button(action: onDone) {
-                    Text("Terminé")
+                    Text(writing ? "Annuler" : "Terminé")
                         .font(.app(16, .semibold))
                         .foregroundStyle(Palette.textSecondary)
                         .padding(.vertical, 14)
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.plain)
-                .padding(.horizontal, 34)
-                .padding(.bottom, 40)
             }
+            .padding(.horizontal, 34)
+            .padding(.bottom, 36)
         }
         .onAppear { pulse = true }
         .transition(.opacity)
+    }
+
+    private var listenPane: some View {
+        VStack(spacing: 32) {
+            Circle()
+                .fill(Palette.accent)
+                .frame(width: 14, height: 14)
+                .scaleEffect(pulse ? 2.4 : 1)
+                .opacity(pulse ? 0.15 : 1)
+                .overlay(
+                    Circle().fill(Palette.accent).frame(width: 14, height: 14)
+                )
+                .animation(.easeInOut(duration: 1).repeatForever(autoreverses: true), value: pulse)
+
+            Text("Je t'écoute, \(name).")
+                .font(.app(24, .bold))
+                .tracking(-0.5)
+                .foregroundStyle(Palette.textPrimary)
+
+            Text(hint)
+                .font(.app(transcript.isEmpty ? 16 : 20, transcript.isEmpty ? .medium : .semibold))
+                .foregroundStyle(transcript.isEmpty ? Palette.textTertiary : Palette.textSecondary)
+                .multilineTextAlignment(.center)
+                .lineSpacing(4)
+                .padding(.horizontal, 40)
+                .animation(.easeOut(duration: 0.15), value: transcript)
+        }
+        .padding(.bottom, 40)
+    }
+
+    private var writePane: some View {
+        VStack(spacing: 24) {
+            Text("Je t'écoute, \(name).")
+                .font(.app(24, .bold))
+                .tracking(-0.5)
+                .foregroundStyle(Palette.textPrimary)
+
+            TextField("", text: $typed,
+                      prompt: Text("Écris, je note.").foregroundColor(Palette.textFaint),
+                      axis: .vertical)
+                .lineLimit(1...4)
+                .font(.app(20, .semibold))
+                .foregroundStyle(Palette.textPrimary)
+                .tint(Palette.accent)
+                .focused($fieldFocused)
+                .submitLabel(.done)
+                .onSubmit(send)
+                .padding(.vertical, 12)
+                .overlay(alignment: .bottom) {
+                    Rectangle().fill(Palette.accent).frame(height: 2)
+                }
+        }
+        .padding(.horizontal, 40)
+        .padding(.bottom, 60)
+    }
+
+    private func send() {
+        let value = typed.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return }
+        typed = ""
+        fieldFocused = false
+        onWrite(value)
     }
 }
 

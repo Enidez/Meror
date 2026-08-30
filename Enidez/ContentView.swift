@@ -21,13 +21,21 @@ struct ContentView: View {
                 .transition(.opacity)
 
             if model.isListening {
-                ListeningOverlay(name: model.name,
-                                 transcript: model.speech.transcript,
-                                 status: model.speech.status) {
-                    withAnimation(.easeInOut(duration: 0.25)) {
-                        model.isListening = false
-                    }
-                }
+                ListeningOverlay(
+                    name: model.name,
+                    transcript: model.speech.transcript,
+                    status: model.speech.status,
+                    onDone: {
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            model.isListening = false
+                        }
+                    },
+                    onWrite: { text in
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            model.isListening = false   // ferme le micro
+                        }
+                        model.capture(text)
+                    })
             }
         }
         .preferredColorScheme(.dark)
