@@ -29,8 +29,10 @@ struct YouView: View {
                         sleepSection
                         activitySection
                         focusSection
+                        matteredSection
                         threeMonths
                         adviceCard
+                        remindersSection($model.remindersOn)
                         bedtimeSection($model.life.targetBedtime)
                         connectionNote
                         Text(AdviceEngine.summaryLine(closedThisWeek: model.closedThisWeek))
@@ -100,6 +102,68 @@ struct YouView: View {
                 .font(.app(16, .semibold))
                 .foregroundStyle(Color(hex: 0xD6D6D9))
                 .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    // MARK: - Ce qui a compté
+
+    @ViewBuilder
+    private var matteredSection: some View {
+        let notes = model.dayNotes.filter { !$0.mattered.isEmpty }.suffix(5).reversed()
+        if !notes.isEmpty {
+            Card {
+                Text("CE QUI A COMPTÉ").sectionLabel()
+                ForEach(Array(notes)) { note in
+                    HStack(alignment: .top, spacing: 12) {
+                        Circle().fill(Palette.accent.opacity(0.7)).frame(width: 5, height: 5)
+                            .padding(.top, 7)
+                        Text(note.mattered)
+                            .font(.app(15, .medium))
+                            .foregroundStyle(Color(hex: 0xD6D6D9))
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 0)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Rappels
+
+    private func remindersSection(_ on: Binding<Bool>) -> some View {
+        Card {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("RAPPELS").sectionLabel()
+                    Text("Un le matin pour ouvrir la journée, un le soir pour la clore.")
+                        .font(.app(13, .medium))
+                        .foregroundStyle(Palette.textTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer()
+                Toggle("", isOn: on)
+                    .labelsHidden()
+                    .tint(Palette.accent)
+            }
+
+            if !model.pickedToday.isEmpty
+                && !Calendar.current.isDateInToday(model.eveningDoneOn ?? .distantPast) {
+                Divider().overlay(Palette.separator)
+                Button {
+                    model.go(to: .evening)
+                } label: {
+                    HStack {
+                        Text("Clore ma journée maintenant")
+                            .font(.app(15, .semibold))
+                            .foregroundStyle(Palette.textSecondary)
+                        Spacer()
+                        Image(systemName: "moon")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(Palette.textMuted)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
         }
     }
 

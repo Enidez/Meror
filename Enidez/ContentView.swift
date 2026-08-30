@@ -10,6 +10,7 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var model = AppModel()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         ZStack {
@@ -37,6 +38,9 @@ struct ContentView: View {
         .task {
             await model.loadHealthData()
         }
+        .onChange(of: scenePhase, initial: true) { _, phase in
+            if phase == .active { model.checkForEvening() }
+        }
     }
 
     @ViewBuilder
@@ -50,6 +54,7 @@ struct ContentView: View {
         case .afterCoffee: AfterCoffeeView()
         case .triage:      TriageView()
         case .app:         AppTabs()
+        case .evening:     EveningView()
         }
     }
 }

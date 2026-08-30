@@ -24,6 +24,9 @@ struct StoredState: Codable {
     var items: [Item]
     var deadlines: [Deadline]
     var capturedThoughts: [String]
+    var dayNotes: [DayNote]?
+    var eveningDoneOn: Date?
+    var remindersOn: Bool?
     var lastMood: Mood?
     var targetBedtime: Date
     var savedAt: Date

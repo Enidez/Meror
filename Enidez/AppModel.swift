@@ -24,6 +24,7 @@ enum Screen: String, Codable {
     case afterCoffee
     case triage       // Le tri : quelles deux choses aujourd'hui
     case app          // Rituel terminé : on vit dans les onglets
+    case evening      // Le bilan du soir
 }
 
 /// Les onglets de l'app.
@@ -90,6 +91,26 @@ final class AppModel {
     /// Les pensées parasites confiées pendant un focus.
     var capturedThoughts: [String] = [] { didSet { persist() } }
 
+    /// Les journées refermées (bilan du soir).
+    var dayNotes: [DayNote] = [] { didSet { persist() } }
+
+    /// Dernier bilan du soir effectué.
+    var eveningDoneOn: Date? { didSet { persist() } }
+
+    /// Rappels matin + soir.
+    var remindersOn = false {
+        didSet {
+            guard isReady, remindersOn != oldValue else { return }
+            if remindersOn {
+                let (h, m) = eveningReminderTime
+                Task { await Reminders.enable(eveningHour: h, eveningMinute: m) }
+            } else {
+                Reminders.disable()
+            }
+            persist()
+        }
+    }
+
     /// Tout ce que tu as à faire. Le backlog. La plupart est gardée de côté ;
     /// deux choses au plus sont « choisies » pour le jour.
     var items: [Item] = Item.starter { didSet { persist() } }
@@ -119,10 +140,26 @@ final class AppModel {
     /// La chose suivante, discrète.
     var nextPick: Item? { todayPicks.dropFirst().first }
 
-    /// Ce qui est gardé de côté : ouvert, non choisi aujourd'hui, sans échéance passée.
+    /// Ce qui est gardé de côté : ouvert, non choisi aujourd'hui.
     var heldItems: [Item] {
         items.filter { $0.isOpen && !$0.isPickedToday }
             .sorted { ($0.due ?? .distantFuture) < ($1.due ?? .distantFuture) }
+    }
+
+    /// Tout ce qui a été choisi aujourd'hui, fait ou non (pour le bilan du soir).
+    var pickedToday: [Item] {
+        items.filter {
+            guard let p = $0.pickedOn else { return false }
+            return Calendar.current.isDateInToday(p)
+        }
+    }
+
+    /// L'heure du rappel du soir : l'objectif de coucher moins ~1 h 30.
+    var eveningReminderTime: (hour: Int, minute: Int) {
+        let t = Calendar.current.date(byAdding: .minute, value: -90, to: life.targetBedtime)
+            ?? life.targetBedtime
+        let c = Calendar.current.dateComponents([.hour, .minute], from: t)
+        return (c.hour ?? 21, c.minute ?? 30)
     }
 
     /// Nombre de choses bouclées cette semaine (vrai compteur).
@@ -138,6 +175,11 @@ final class AppModel {
         restore()
         isReady = true
         persist()
+        // Repose les rappels au cas où l'heure de coucher a changé.
+        if remindersOn {
+            let (h, m) = eveningReminderTime
+            Task { await Reminders.enable(eveningHour: h, eveningMinute: m) }
+        }
     }
 
     private func restore() {
@@ -153,6 +195,9 @@ final class AppModel {
         items = saved.items
         deadlines = saved.deadlines
         capturedThoughts = saved.capturedThoughts
+        dayNotes = saved.dayNotes ?? []
+        eveningDoneOn = saved.eveningDoneOn
+        remindersOn = saved.remindersOn ?? false
         life.lastMood = saved.lastMood
         life.targetBedtime = saved.targetBedtime
 
@@ -163,8 +208,6 @@ final class AppModel {
             tab = .today
         }
 
-        // Relancé en plein tri : on repropose deux choses (la sélection en
-        // cours n'est pas sauvegardée, c'est un choix du moment).
         if screen == .triage {
             triagePicks = Planner.suggestions(from: items, struggle: dailyStruggle).map(\.item.id)
         }
@@ -183,6 +226,9 @@ final class AppModel {
             items: items,
             deadlines: deadlines,
             capturedThoughts: capturedThoughts,
+            dayNotes: dayNotes,
+            eveningDoneOn: eveningDoneOn,
+            remindersOn: remindersOn,
             lastMood: life.lastMood,
             targetBedtime: life.targetBedtime,
             savedAt: Date()
@@ -204,7 +250,48 @@ final class AppModel {
         self.goodDay = goodDay
         life.selfReportedPeriod = energy.period
         isOnboarded = true
+        remindersOn = true   // deux rappels par jour : matin, soir
         go(to: .wakeUp)
+    }
+
+    // MARK: - Bilan du soir
+
+    /// Transitoire : « plus tard » ce soir, on ne redemande pas avant relance.
+    private var eveningSnoozed = false
+
+    /// À l'ouverture / au retour au premier plan : est-ce l'heure du bilan ?
+    func checkForEvening() {
+        guard isOnboarded, screen == .app, !eveningSnoozed else { return }
+        guard !Calendar.current.isDateInToday(eveningDoneOn ?? .distantPast) else { return }
+        guard Calendar.current.component(.hour, from: Date()) >= 18 else { return }
+        guard !pickedToday.isEmpty else { return }   // rien à passer en revue
+        go(to: .evening)
+    }
+
+    /// « Plus tard » : on retourne dans l'app sans nagger avant relance.
+    func snoozeEvening() {
+        eveningSnoozed = true
+        withAnimation(.easeInOut(duration: 0.3)) { screen = .app }
+    }
+
+    /// Referme la journée. Ce qui n'est pas fini repart dans le tri de demain
+    /// tout seul (le Planner lui donne un bonus de continuité).
+    func completeEvening(mood: Mood?, mattered: String) {
+        if let mood { life.lastMood = mood }
+        let done = pickedToday.filter { !$0.isOpen }.count
+        dayNotes.append(DayNote(
+            mood: mood,
+            mattered: mattered.trimmingCharacters(in: .whitespacesAndNewlines),
+            closedCount: done
+        ))
+        eveningDoneOn = Date()
+        withAnimation(.easeInOut(duration: 0.4)) { screen = .app }
+    }
+
+    /// Marque / démarque une chose depuis le bilan.
+    func toggleDone(_ id: UUID) {
+        guard let index = items.firstIndex(where: { $0.id == id }) else { return }
+        items[index].doneAt = items[index].isOpen ? Date() : nil
     }
 
     // MARK: - Démo
@@ -222,6 +309,10 @@ final class AppModel {
         isListening = false
         life = .sample
         capturedThoughts = []
+        dayNotes = []
+        eveningDoneOn = nil
+        remindersOn = false
+        Reminders.disable()
         items = Item.starter
         deadlines = Deadline.starter
         triagePicks = []
