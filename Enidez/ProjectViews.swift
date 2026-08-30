@@ -164,6 +164,283 @@ struct NewProjectView: View {
     }
 }
 
+// MARK: - Un projet, en entier
+
+/// Le seul endroit où l'on voit le bloc complet — et on y vient **exprès**.
+/// Le quotidien continue de ne montrer qu'une marche ; ici on fait le point :
+/// où j'en suis, quand ça arrivera vraiment, et depuis quand la personne qui
+/// attend n'a pas eu de nouvelles.
+struct ProjectDetailView: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    var project: Project
+
+    @State private var newStep = ""
+    @FocusState private var addingStep: Bool
+
+    /// On relit depuis le modèle : la copie passée peut dater.
+    private var live: Project {
+        model.projects.first { $0.id == project.id } ?? project
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Palette.screen.ignoresSafeArea()
+
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 26) {
+                        heading
+                        forecastCard
+                        silenceCard
+                        stepsSection
+                        addStepField
+                        archiveButton
+                    }
+                    .padding(.horizontal, 26)
+                    .padding(.vertical, 20)
+                }
+            }
+            .navigationTitle("Le projet")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Palette.screen, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Fermer") { dismiss() }
+                        .foregroundStyle(Palette.textMuted)
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    // MARK: - En-tête
+
+    private var heading: some View {
+        let p = model.progress(of: live)
+        return VStack(alignment: .leading, spacing: 10) {
+            Text(live.title)
+                .bigTitle(30)
+                .foregroundStyle(Palette.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if !live.why.isEmpty {
+                Text(live.why)
+                    .font(.app(15, .medium))
+                    .foregroundStyle(Palette.sand)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            HStack(spacing: 10) {
+                Text("\(p.done) marche\(p.done > 1 ? "s" : "") sur \(p.total)")
+                    .font(.app(14, .semibold))
+                    .foregroundStyle(Palette.textTertiary)
+                if let due = live.due {
+                    Text("· annoncé pour le \(longDate(due))")
+                        .font(.app(14, .medium))
+                        .foregroundStyle(Palette.textTertiary)
+                }
+            }
+        }
+    }
+
+    // MARK: - La date honnête
+
+    @ViewBuilder
+    private var forecastCard: some View {
+        Card {
+            Text("À TON RYTHME RÉEL").sectionLabel()
+            if let f = model.forecast(for: live) {
+                Text(forecastLine(f))
+                    .font(.app(17, .semibold))
+                    .foregroundStyle(f.daysLate.map { $0 > 0 } == true
+                                     ? Palette.accent : Color(hex: 0xD6D6D9))
+                    .lineSpacing(4)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(String(format: "Tu boucles environ %.1f marche%@ par semaine sur ce projet.",
+                            f.perWeek, f.perWeek >= 2 ? "s" : ""))
+                    .font(.app(13, .medium))
+                    .foregroundStyle(Palette.textTertiary)
+            } else {
+                Text("Encore trop tôt pour dire quoi que ce soit d'honnête. Il faut au moins deux marches bouclées.")
+                    .font(.app(15, .medium))
+                    .foregroundStyle(Palette.textTertiary)
+                    .lineSpacing(4)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private func forecastLine(_ f: Planner.Forecast) -> String {
+        guard let late = f.daysLate else {
+            return "À ce rythme, ce sera terminé vers le \(longDate(f.date))."
+        }
+        if late > 0 {
+            return "À ce rythme, ce sera plutôt le \(longDate(f.date)) — soit \(late) jour\(late > 1 ? "s" : "") après la date annoncée."
+        }
+        return "À ce rythme, tu es dans les temps : vers le \(longDate(f.date))."
+    }
+
+    // MARK: - Le silence
+
+    private var silenceCard: some View {
+        Card {
+            Text("DES NOUVELLES").sectionLabel()
+            if let days = live.daysSinceContact() {
+                Text(days == 0
+                     ? "Tu as donné des nouvelles aujourd'hui."
+                     : "Dernières nouvelles il y a \(days) jour\(days > 1 ? "s" : "").")
+                    .font(.app(16, .semibold))
+                    .foregroundStyle(days >= 10 ? Palette.accent : Color(hex: 0xD6D6D9))
+            } else {
+                Text("Tu n'as encore rien noté.")
+                    .font(.app(16, .semibold))
+                    .foregroundStyle(Color(hex: 0xD6D6D9))
+            }
+
+            Text("Ce n'est presque jamais le retard qui blesse. C'est le silence.")
+                .font(.app(13, .medium))
+                .foregroundStyle(Palette.textTertiary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Button {
+                model.markContacted(live)
+            } label: {
+                Text("J'ai donné des nouvelles")
+                    .font(.app(15, .semibold))
+                    .foregroundStyle(.black)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 46)
+                    .background(Palette.sand, in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 2)
+        }
+    }
+
+    // MARK: - Les marches
+
+    private var stepsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("LES MARCHES").sectionLabel()
+            Text("Tu es venu voir : c'est le seul endroit où tout est là. Au quotidien, l'app ne t'en montre qu'une.")
+                .font(.app(13, .medium))
+                .foregroundStyle(Palette.textTertiary)
+                .lineSpacing(3)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.bottom, 6)
+
+            ForEach(model.steps(of: live)) { step in
+                Button {
+                    withAnimation(.easeInOut(duration: 0.15)) { model.toggleStep(step) }
+                } label: {
+                    HStack(spacing: 14) {
+                        ZStack {
+                            Circle()
+                                .strokeBorder(step.isOpen ? Color.white.opacity(0.18) : Palette.accent,
+                                              lineWidth: 2)
+                                .frame(width: 22, height: 22)
+                            if !step.isOpen {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundStyle(Palette.accent)
+                            }
+                        }
+                        Text(step.title)
+                            .font(.app(16, .medium))
+                            .foregroundStyle(step.isOpen ? Color(hex: 0xD6D6D9) : Palette.textTertiary)
+                            .strikethrough(!step.isOpen, color: Palette.textGhost)
+                            .multilineTextAlignment(.leading)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+                    .background(Palette.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var addStepField: some View {
+        HStack(spacing: 10) {
+            TextField("", text: $newStep,
+                      prompt: Text("Ajouter une marche").foregroundColor(Palette.textFaint))
+                .font(.app(15, .medium))
+                .foregroundStyle(Palette.textPrimary)
+                .tint(Palette.accent)
+                .focused($addingStep)
+                .submitLabel(.done)
+                .onSubmit(addStep)
+            if !newStep.trimmingCharacters(in: .whitespaces).isEmpty {
+                Button(action: addStep) {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.system(size: 26))
+                        .foregroundStyle(Palette.accent)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.leading, 18)
+        .padding(.trailing, 10)
+        .frame(height: 52)
+        .background(Palette.surfaceRaised, in: Capsule())
+        .overlay(Capsule().stroke(Palette.hairline, lineWidth: 1))
+    }
+
+    private func addStep() {
+        let value = newStep.trimmingCharacters(in: .whitespacesAndNewlines)
+        newStep = ""
+        addingStep = false
+        guard !value.isEmpty else { return }
+        model.addStep(value, to: live.id)
+    }
+
+    private var archiveButton: some View {
+        Button {
+            model.archive(live)
+            dismiss()
+        } label: {
+            Text("Ranger ce projet")
+                .font(.app(14, .medium))
+                .foregroundStyle(Palette.textGhost)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 6)
+    }
+
+    private func longDate(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "fr_FR")
+        f.dateFormat = "d MMMM"
+        return f.string(from: date)
+    }
+}
+
+// MARK: - Carte et étiquette
+
+private struct Card<Content: View>: View {
+    @ViewBuilder var content: Content
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            content
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(18)
+        .background(Palette.surface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+    }
+}
+
+private extension Text {
+    func sectionLabel() -> some View {
+        self.font(.app(11, .bold))
+            .tracking(2)
+            .foregroundStyle(Palette.sandGhost)
+    }
+}
+
 // MARK: - Les projets en cours
 
 /// Une ligne par projet : sa marche suivante, et rien d'autre du bloc.

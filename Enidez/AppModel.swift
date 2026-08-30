@@ -346,6 +346,28 @@ final class AppModel {
         Planner.progress(of: project.id, in: items)
     }
 
+    /// Toutes les marches d'un projet, dans l'ordre. C'est la seule vue où le
+    /// bloc entier est visible — et on y va exprès, ce n'est jamais imposé.
+    func steps(of project: Project) -> [Item] {
+        items.filter { $0.projectID == project.id }.sorted { $0.step < $1.step }
+    }
+
+    /// Ce que ton rythme réel dit de la date d'arrivée.
+    func forecast(for project: Project) -> Planner.Forecast? {
+        Planner.forecast(for: project, in: items)
+    }
+
+    /// Note qu'on vient de donner des nouvelles.
+    func markContacted(_ project: Project) {
+        guard let index = projects.firstIndex(where: { $0.id == project.id }) else { return }
+        projects[index].lastContactAt = Date()
+    }
+
+    /// Coche ou décoche une marche depuis l'écran du projet.
+    func toggleStep(_ item: Item) {
+        toggleDone(item.id)
+    }
+
     /// Range un projet terminé (ou abandonné) sans effacer son histoire.
     func archive(_ project: Project) {
         guard let index = projects.firstIndex(where: { $0.id == project.id }) else { return }

@@ -18,6 +18,7 @@ struct UpcomingView: View {
     /// Le jour touché, ou `nil` pour la liste de ce qui arrive.
     @State private var selectedDay: Date?
     @State private var showNewProject = false
+    @State private var openProject: Project?
 
     private let weekDays = ["L", "M", "M", "J", "V", "S", "D"]
     private var cal: Calendar { Calendar.current }
@@ -51,6 +52,9 @@ struct UpcomingView: View {
         .onDisappear { model.pendingDueDay = nil }
         .sheet(isPresented: $showNewProject) {
             NewProjectView().environment(model)
+        }
+        .sheet(item: $openProject) { project in
+            ProjectDetailView(project: project).environment(model)
         }
         // Ce qu'on vient d'ajouter doit se voir : on va le chercher là où il
         // est tombé, même si c'est un autre mois.
@@ -234,7 +238,10 @@ struct UpcomingView: View {
                     .foregroundStyle(Palette.sandGhost)
                     .padding(.bottom, 2)
                 ForEach(model.activeProjects) { project in
-                    ProjectRow(project: project)
+                    Button { openProject = project } label: {
+                        ProjectRow(project: project)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

@@ -63,8 +63,20 @@ struct Project: Identifiable, Codable {
     var due: Date?
     var createdAt = Date()
     var archivedAt: Date?
+    /// Dernière fois qu'on a donné des nouvelles à la personne qui attend.
+    /// Ce n'est presque jamais le retard qui blesse un client : c'est le silence.
+    var lastContactAt: Date?
 
     var isActive: Bool { archivedAt == nil }
+
+    /// Depuis combien de jours la personne n'a pas eu de nouvelles.
+    /// `nil` si on n'a jamais rien noté.
+    func daysSinceContact(on day: Date = Date()) -> Int? {
+        guard let lastContactAt else { return nil }
+        return Calendar.current.dateComponents([.day],
+                                               from: Calendar.current.startOfDay(for: lastContactAt),
+                                               to: Calendar.current.startOfDay(for: day)).day
+    }
 
     /// Relecture tolérante : une clé absente reprend sa valeur par défaut au
     /// lieu de faire échouer toute la sauvegarde. Sans ça, ajouter un champ
@@ -77,12 +89,14 @@ struct Project: Identifiable, Codable {
         due = try c.decodeIfPresent(Date.self, forKey: .due)
         createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
         archivedAt = try c.decodeIfPresent(Date.self, forKey: .archivedAt)
+        lastContactAt = try c.decodeIfPresent(Date.self, forKey: .lastContactAt)
     }
 
     init(id: UUID = UUID(), title: String, why: String = "", due: Date? = nil,
-         createdAt: Date = Date(), archivedAt: Date? = nil) {
+         createdAt: Date = Date(), archivedAt: Date? = nil, lastContactAt: Date? = nil) {
         self.id = id; self.title = title; self.why = why
         self.due = due; self.createdAt = createdAt; self.archivedAt = archivedAt
+        self.lastContactAt = lastContactAt
     }
 }
 
@@ -209,6 +223,49 @@ enum Planner {
     static func progress(of projectID: UUID, in items: [Item]) -> (done: Int, total: Int) {
         let steps = items.filter { $0.projectID == projectID }
         return (steps.filter { !$0.isOpen }.count, steps.count)
+    }
+
+    // MARK: - La date honnête
+
+    /// Ce que le rythme réel dit d'un projet — pas ce qu'on espère.
+    ///
+    /// Un retard naît le plus souvent d'une promesse déjà impossible au moment
+    /// où on la fait. On mesure donc la cadence *vécue* (marches bouclées
+    /// rapportées aux jours écoulés, jours creux compris) et on projette.
+    struct Forecast {
+        /// Date d'arrivée au rythme actuel.
+        var date: Date
+        /// Jours de retard sur l'échéance annoncée (négatif = en avance).
+        var daysLate: Int?
+        /// Marches par semaine, pour l'expliquer simplement.
+        var perWeek: Double
+    }
+
+    /// `nil` tant qu'on n'a pas de quoi être honnête : il faut au moins deux
+    /// marches bouclées, sinon on inventerait.
+    static func forecast(for project: Project, in items: [Item],
+                         on day: Date = Date()) -> Forecast? {
+        let cal = Calendar.current
+        let steps = items.filter { $0.projectID == project.id }
+        let done = steps.filter { !$0.isOpen }
+        let remaining = steps.count - done.count
+        guard done.count >= 2, remaining > 0 else { return nil }
+
+        let elapsed = max(1, cal.dateComponents([.day],
+                                                from: cal.startOfDay(for: project.createdAt),
+                                                to: cal.startOfDay(for: day)).day ?? 1)
+        let perDay = Double(done.count) / Double(elapsed)
+        guard perDay > 0 else { return nil }
+
+        let daysNeeded = Int((Double(remaining) / perDay).rounded(.up))
+        guard let date = cal.date(byAdding: .day, value: daysNeeded, to: cal.startOfDay(for: day)) else {
+            return nil
+        }
+        let daysLate = project.due.map {
+            cal.dateComponents([.day], from: cal.startOfDay(for: $0),
+                               to: cal.startOfDay(for: date)).day ?? 0
+        }
+        return Forecast(date: date, daysLate: daysLate, perWeek: perDay * 7)
     }
 
     // MARK: - Score
