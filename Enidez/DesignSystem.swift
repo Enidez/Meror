@@ -7,6 +7,10 @@
 //
 
 import SwiftUI
+import CoreText
+#if canImport(UIKit)
+import UIKit
+#endif
 
 /// Couleurs de l'application, dérivées du brief de design.
 enum Palette {
@@ -51,11 +55,47 @@ extension Color {
     }
 }
 
+// MARK: - Typographie
+
+/// La police de Meror. Manrope (SIL OFL) est embarquée : c'est elle qui
+/// distingue l'app de tout ce qui se contente de la police système d'Apple.
+/// Un seul fichier variable porte toutes les graisses.
+enum Typeface {
+    /// Enregistre la police auprès du système. À appeler une fois au lancement.
+    static func register() {
+        guard let url = Bundle.main.url(forResource: "Manrope", withExtension: "ttf") else {
+            return   // absente : on retombera sur la police système
+        }
+        CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
+    }
+
+    /// Le nom PostScript de l'instance correspondant à une graisse SwiftUI.
+    /// Manrope monte jusqu'à ExtraBold (800) : `.heavy` et `.black` y mènent.
+    static func name(for weight: Font.Weight) -> String {
+        switch weight {
+        case .ultraLight, .thin: "Manrope-ExtraLight"
+        case .light:             "Manrope-Light"
+        case .regular:           "Manrope-Regular"
+        case .medium:            "Manrope-Medium"
+        case .semibold:          "Manrope-SemiBold"
+        case .bold:              "Manrope-Bold"
+        default:                 "Manrope-ExtraBold"   // .heavy, .black
+        }
+    }
+
+    /// Vrai si Manrope a bien été chargée (sinon on garde la police système).
+    static var isAvailable: Bool {
+        UIFont(name: "Manrope-Regular", size: 12) != nil
+    }
+}
+
 extension Font {
-    /// Police de l'application. Le design vise Manrope ; en son absence on
-    /// s'appuie sur la police système, très proche à ces graisses.
+    /// Police de l'application : Manrope, avec repli propre sur la police
+    /// système si le fichier venait à manquer.
     static func app(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
-        .system(size: size, weight: weight)
+        Typeface.isAvailable
+            ? .custom(Typeface.name(for: weight), size: size)
+            : .system(size: size, weight: weight)
     }
 }
 

@@ -11,6 +11,8 @@ import SwiftUI
 struct EnidezApp: App {
 
     init() {
+        Typeface.register()
+
         // Barre d'onglets : noir plein, filet discret, comme le reste de l'app.
         #if os(iOS)
         let appearance = UITabBarAppearance()
