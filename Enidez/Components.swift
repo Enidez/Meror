@@ -366,6 +366,33 @@ struct ListeningOverlay: View {
     }
 }
 
+// MARK: - La marque
+
+/// La marque de Meror, immobile : neuf points, la diagonale allumée.
+/// On la pose là où l'app respire — quand il n'y a plus rien à faire,
+/// quand il n'y a rien à montrer. Jamais en décoration d'un écran chargé.
+struct MerorMark: View {
+    var unit: CGFloat = 7
+    var gap: CGFloat = 12
+    var tint: Color = Palette.accent
+    /// Opacité des points éteints.
+    var dim: Double = 0.10
+
+    var body: some View {
+        VStack(spacing: gap) {
+            ForEach(0..<3, id: \.self) { row in
+                HStack(spacing: gap) {
+                    ForEach(0..<3, id: \.self) { col in
+                        Circle()
+                            .fill(row == col ? tint : Color.white.opacity(dim))
+                            .frame(width: unit, height: unit)
+                    }
+                }
+            }
+        }
+    }
+}
+
 // MARK: - L'attente (pause café)
 
 /// Le temps qui passe, dans la langue de Meror : la marque à neuf points,

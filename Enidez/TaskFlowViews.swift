@@ -160,7 +160,7 @@ struct TodayView: View {
             } label: {
                 Text("Je garde \(count) autre\(count > 1 ? "s" : "") chose\(count > 1 ? "s" : "") de côté.")
                     .font(.app(14, .semibold))
-                    .foregroundStyle(Palette.textMuted)
+                    .foregroundStyle(Palette.sand)
             }
             .buttonStyle(.plain)
             .padding(.top, 4)
@@ -175,6 +175,8 @@ struct TodayView: View {
     /// Affiché quand tout est fait : le mot du jour, calme et fixe.
     private func restingNote(_ note: RestingNote) -> some View {
         VStack(spacing: 16) {
+            MerorMark(unit: 6, gap: 10, tint: Palette.accent.opacity(0.65))
+                .padding(.bottom, 10)
             if let label = note.label {
                 Text(label)
                     .font(.app(12, .bold))
@@ -226,7 +228,7 @@ struct TodayView: View {
     private func nextRow(_ item: Item) -> some View {
         HStack(spacing: 14) {
             Circle()
-                .stroke(Color.white.opacity(0.18), lineWidth: 2)
+                .stroke(Palette.sand.opacity(0.55), lineWidth: 2)
                 .frame(width: 22, height: 22)
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.title)
@@ -234,7 +236,7 @@ struct TodayView: View {
                     .foregroundStyle(Color(hex: 0xD6D6D9))
                 Text(item.estimateLabel.map { "\($0) · ensuite" } ?? "ensuite")
                     .font(.app(14, .medium))
-                    .foregroundStyle(Palette.textTertiary)
+                    .foregroundStyle(Palette.sand.opacity(0.85))
             }
             Spacer()
         }

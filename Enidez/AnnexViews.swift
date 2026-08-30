@@ -195,12 +195,15 @@ struct UpcomingView: View {
                 .padding(.bottom, 6)
 
             if shown.isEmpty {
-                Text(selectedDay == nil
-                     ? "Rien de daté pour l'instant."
-                     : "Rien ce jour-là. Ajoute quelque chose en bas.")
-                    .font(.app(15, .medium))
-                    .foregroundStyle(Palette.textTertiary)
-                    .padding(.vertical, 14)
+                HStack(spacing: 16) {
+                    MerorMark(unit: 5, gap: 8, tint: Palette.sand.opacity(0.55))
+                    Text(selectedDay == nil
+                         ? "Rien de daté pour l'instant."
+                         : "Rien ce jour-là. Ajoute quelque chose en bas.")
+                        .font(.app(15, .medium))
+                        .foregroundStyle(Palette.textTertiary)
+                }
+                .padding(.vertical, 18)
             } else {
                 ForEach(shown) { item in
                     row(item)
@@ -211,7 +214,7 @@ struct UpcomingView: View {
                 Text("SANS DATE")
                     .font(.app(12, .bold))
                     .tracking(2)
-                    .foregroundStyle(Palette.textGhost)
+                    .foregroundStyle(Palette.sandGhost)
                     .padding(.top, 26)
                     .padding(.bottom, 6)
                 ForEach(undated) { item in
