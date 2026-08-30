@@ -262,47 +262,18 @@ struct ListeningOverlay: View {
     }
 
     var body: some View {
+        // Une seule chose à l'écran : le fond est plein, jamais translucide.
+        // Un voile laissait transparaître la page du dessous et les textes
+        // se chevauchaient.
         ZStack {
-            Color.black.opacity(0.72).ignoresSafeArea()
+            Palette.screen.ignoresSafeArea()
 
-            if writing { writePane } else { listenPane }
-
-            VStack {
-                Spacer()
-                if writing {
-                    Button(action: send) {
-                        Text("Envoyer")
-                            .font(.app(16, .bold))
-                            .foregroundStyle(.black)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 54)
-                            .background(Palette.accent, in: Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(typed.trimmingCharacters(in: .whitespaces).isEmpty)
-                    .opacity(typed.trimmingCharacters(in: .whitespaces).isEmpty ? 0.4 : 1)
-                } else {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) { writing = true }
-                        fieldFocused = true
-                    } label: {
-                        Text("Écrire plutôt")
-                            .font(.app(15, .semibold))
-                            .foregroundStyle(Palette.textMuted)
-                            .padding(.vertical, 10)
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.plain)
-                }
-
-                Button(action: onDone) {
-                    Text(writing ? "Annuler" : "Terminé")
-                        .font(.app(16, .semibold))
-                        .foregroundStyle(Palette.textSecondary)
-                        .padding(.vertical, 14)
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.plain)
+            // Une seule colonne : rien ne peut se superposer.
+            VStack(spacing: 0) {
+                Spacer(minLength: 24)
+                if writing { writePane } else { listenPane }
+                Spacer(minLength: 24)
+                footer
             }
             .padding(.horizontal, 34)
             .padding(.bottom, 36)
@@ -315,6 +286,46 @@ struct ListeningOverlay: View {
             }
         }
         .transition(.opacity)
+    }
+
+    @ViewBuilder
+    private var footer: some View {
+        VStack(spacing: 4) {
+            if writing {
+                Button(action: send) {
+                    Text("Envoyer")
+                        .font(.app(16, .bold))
+                        .foregroundStyle(.black)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 54)
+                        .background(Palette.accent, in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .disabled(typed.trimmingCharacters(in: .whitespaces).isEmpty)
+                .opacity(typed.trimmingCharacters(in: .whitespaces).isEmpty ? 0.4 : 1)
+            } else {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { writing = true }
+                    fieldFocused = true
+                } label: {
+                    Text("Écrire plutôt")
+                        .font(.app(15, .semibold))
+                        .foregroundStyle(Palette.sand)
+                        .padding(.vertical, 12)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.plain)
+            }
+
+            Button(action: onDone) {
+                Text(writing ? "Annuler" : "Terminé")
+                    .font(.app(16, .semibold))
+                    .foregroundStyle(Palette.textSecondary)
+                    .padding(.vertical, 14)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.plain)
+        }
     }
 
     private var listenPane: some View {
@@ -342,7 +353,6 @@ struct ListeningOverlay: View {
                 .padding(.horizontal, 40)
                 .animation(.easeOut(duration: 0.15), value: transcript)
         }
-        .padding(.bottom, 40)
     }
 
     private var writePane: some View {
@@ -367,8 +377,7 @@ struct ListeningOverlay: View {
                     Rectangle().fill(Palette.accent).frame(height: 2)
                 }
         }
-        .padding(.horizontal, 40)
-        .padding(.bottom, 60)
+        .padding(.horizontal, 6)
     }
 
     private func send() {
