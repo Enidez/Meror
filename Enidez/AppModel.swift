@@ -109,6 +109,10 @@ final class AppModel {
     /// Sélection en cours sur l'écran de tri (max 2).
     var triagePicks: [UUID] = []
 
+    /// La dernière chose saisie, pour que l'écran puisse la montrer.
+    /// Transitoire : on ne la garde pas d'un lancement à l'autre.
+    private(set) var lastCaptured: Item?
+
     /// Accès à Apple Santé et au micro.
     private let health = HealthService()
     let speech = SpeechService()
@@ -472,6 +476,7 @@ final class AppModel {
         if screen == .triage {
             items.append(item)
             if triagePicks.count < 2 { triagePicks.append(item.id) }
+            lastCaptured = item
             return
         }
 
@@ -481,5 +486,6 @@ final class AppModel {
             item.pickedOn = Date()
         }
         items.append(item)
+        lastCaptured = item
     }
 }

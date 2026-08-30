@@ -44,6 +44,15 @@ struct UpcomingView: View {
                     .padding(.bottom, 44)   // dégage la barre d'onglets flottante
             }
         }
+        // Ce qu'on vient d'ajouter doit se voir : on va le chercher là où il
+        // est tombé, même si c'est un autre mois.
+        .onChange(of: model.lastCaptured?.id) { _, _ in
+            guard let due = model.lastCaptured?.due else { return }
+            withAnimation(.easeInOut(duration: 0.25)) {
+                monthAnchor = due
+                selectedDay = due
+            }
+        }
     }
 
     // MARK: - En-tête et navigation
@@ -169,6 +178,11 @@ struct UpcomingView: View {
             .sorted { ($0.due ?? .distantFuture) < ($1.due ?? .distantFuture) }
     }
 
+    /// Ce qui est ouvert mais sans échéance : sinon ça disparaîtrait de la vue.
+    private var undated: [Item] {
+        model.items.filter { $0.isOpen && $0.due == nil }
+    }
+
     @ViewBuilder
     private var list: some View {
         let shown = selectedDay.map(items(on:)) ?? upcoming
@@ -192,13 +206,25 @@ struct UpcomingView: View {
                     row(item)
                 }
             }
+
+            if selectedDay == nil && !undated.isEmpty {
+                Text("SANS DATE")
+                    .font(.app(12, .bold))
+                    .tracking(2)
+                    .foregroundStyle(Palette.textGhost)
+                    .padding(.top, 26)
+                    .padding(.bottom, 6)
+                ForEach(undated) { item in
+                    row(item)
+                }
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func row(_ item: Item) -> some View {
         HStack(spacing: 14) {
-            Text(item.due.map(VoiceInterpreter.shortLabel) ?? "")
+            Text(item.due.map(VoiceInterpreter.shortLabel) ?? "—")
                 .font(.app(13, .bold))
                 .foregroundStyle(Palette.textTertiary)
                 .frame(width: 58, alignment: .leading)

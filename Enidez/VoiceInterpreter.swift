@@ -47,16 +47,37 @@ enum VoiceInterpreter {
         guard let match, var date = match.date,
               let range = Range(match.range, in: phrase) else { return nil }
 
-        // Une date passée signifie presque toujours « la prochaine fois » :
-        // on avance de semaine en semaine jusqu'à retomber dans le futur.
+        // Une date passée veut dire « la prochaine fois ». Mais la prochaine
+        // fois n'est pas la même chose selon ce qui a été dit : un jour de la
+        // semaine (« mardi ») revient dans sept jours ; une date du calendrier
+        // (« le 21 juillet ») revient l'an prochain.
         let cal = Calendar.current
         let today = cal.startOfDay(for: Date())
-        var guardCount = 0
-        while date < today && guardCount < 8 {
-            date = cal.date(byAdding: .day, value: 7, to: date) ?? date
-            guardCount += 1
+        if date < today {
+            if namesWeekdayOnly(String(phrase[range])) {
+                var guardCount = 0
+                while date < today && guardCount < 8 {
+                    date = cal.date(byAdding: .day, value: 7, to: date) ?? date
+                    guardCount += 1
+                }
+            } else {
+                var guardCount = 0
+                while date < today && guardCount < 3 {
+                    date = cal.date(byAdding: .year, value: 1, to: date) ?? date
+                    guardCount += 1
+                }
+            }
         }
         return (date, range)
+    }
+
+    /// Vrai quand le fragment reconnu ne nomme qu'un jour de la semaine,
+    /// sans quantième ni mois — « mardi », « vendredi prochain ».
+    private static func namesWeekdayOnly(_ fragment: String) -> Bool {
+        let f = fold(fragment)
+        guard !f.contains(where: \.isNumber) else { return false }
+        let weekdays = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
+        return weekdays.contains { f.contains($0) }
     }
 
     /// Ce que `NSDataDetector` ne sait pas faire en français : « demain »,
