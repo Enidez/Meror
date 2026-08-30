@@ -82,6 +82,27 @@ struct MicButton: View {
     }
 }
 
+/// Le pendant du micro : une bulle, pour écrire quand on ne peut pas parler.
+struct WriteButton: View {
+    var size: CGFloat = 54
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Circle()
+                .fill(Palette.surfaceRaised)
+                .overlay(Circle().stroke(Palette.hairline, lineWidth: 1))
+                .frame(width: size, height: size)
+                .overlay(
+                    Image(systemName: "bubble.left")
+                        .font(.system(size: size * 0.34, weight: .regular))
+                        .foregroundStyle(Palette.textSecondary)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 /// Bouton principal pleine largeur, blanc, texte noir.
 struct PrimaryButton: View {
     var title: String
@@ -205,6 +226,8 @@ struct ListeningOverlay: View {
     var status: SpeechService.Status = .listening
     var onDone: () -> Void
     var onWrite: (String) -> Void = { _ in }
+    /// Ouvre directement au clavier, sans passer par l'écoute.
+    var startsWriting = false
 
     @State private var pulse = false
     @State private var writing = false
@@ -268,7 +291,13 @@ struct ListeningOverlay: View {
             .padding(.horizontal, 34)
             .padding(.bottom, 36)
         }
-        .onAppear { pulse = true }
+        .onAppear {
+            pulse = true
+            if startsWriting {
+                writing = true
+                fieldFocused = true
+            }
+        }
         .transition(.opacity)
     }
 

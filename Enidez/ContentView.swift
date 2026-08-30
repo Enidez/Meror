@@ -20,7 +20,7 @@ struct ContentView: View {
                 .environment(model)
                 .transition(.opacity)
 
-            if model.isListening {
+            if model.isListening || model.isWriting {
                 ListeningOverlay(
                     name: model.name,
                     transcript: model.speech.transcript,
@@ -28,14 +28,17 @@ struct ContentView: View {
                     onDone: {
                         withAnimation(.easeInOut(duration: 0.25)) {
                             model.isListening = false
+                            model.isWriting = false
                         }
                     },
                     onWrite: { text in
                         withAnimation(.easeInOut(duration: 0.25)) {
                             model.isListening = false   // ferme le micro
+                            model.isWriting = false
                         }
                         model.capture(text)
-                    })
+                    },
+                    startsWriting: model.isWriting)
             }
         }
         .preferredColorScheme(.dark)

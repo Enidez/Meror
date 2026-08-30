@@ -297,9 +297,13 @@ struct HyperfocusView: View {
 
                 Spacer()
 
-                // Rien d'autre : une pensée parasite se confie d'un geste.
-                MicButton { model.isListening = true }
-                    .padding(.bottom, 28)
+                // Rien d'autre : une pensée parasite se confie d'un geste,
+                // à la voix ou au clavier.
+                HStack(spacing: 14) {
+                    MicButton { model.isListening = true }
+                    WriteButton { model.isWriting = true }
+                }
+                .padding(.bottom, 28)
             }
         }
         .task(id: running) {

@@ -85,6 +85,10 @@ final class AppModel {
         }
     }
 
+    /// Vrai quand on a choisi d'écrire plutôt que de parler. Transitoire :
+    /// ouvre le même voile, directement au clavier.
+    var isWriting = false
+
     /// Ce que l'assistant sait de toi : sommeil, activité, focus, humeur.
     var life = LifeContext.sample { didSet { persist() } }
 
