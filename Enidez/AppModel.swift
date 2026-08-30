@@ -55,7 +55,17 @@ final class AppModel {
     var tab: AppTab = .today { didSet { persist() } }
 
     /// Vrai quand le minuteur de focus est ouvert par-dessus Aujourd'hui.
-    var inFocus = false
+    /// Tant qu'il dure, l'app se tait : rien ne doit interrompre un élan.
+    var inFocus = false {
+        didSet {
+            guard isReady, inFocus != oldValue else { return }
+            if inFocus {
+                Reminders.silenceMidday()
+            } else {
+                refreshMiddayNudge()
+            }
+        }
+    }
 
     /// Vrai quand l'assistant écoute (retour visuel du micro).
     var isListening = false {

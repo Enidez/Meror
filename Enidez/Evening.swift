@@ -95,6 +95,13 @@ enum Reminders {
                  title: nudge.title, body: nudge.body)
     }
 
+    /// Retire le mot du milieu sans toucher aux deux rendez-vous fixes.
+    /// Utilisé pendant un focus : on ne coupe pas un élan.
+    static func silenceMidday() {
+        UNUserNotificationCenter.current()
+            .removePendingNotificationRequests(withIdentifiers: [middayID])
+    }
+
     static func disable() {
         UNUserNotificationCenter.current()
             .removePendingNotificationRequests(withIdentifiers: [morningID, middayID, eveningID])

@@ -65,6 +65,25 @@ struct Project: Identifiable, Codable {
     var archivedAt: Date?
 
     var isActive: Bool { archivedAt == nil }
+
+    /// Relecture tolérante : une clé absente reprend sa valeur par défaut au
+    /// lieu de faire échouer toute la sauvegarde. Sans ça, ajouter un champ
+    /// un jour effacerait les projets de tout le monde.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        title = try c.decodeIfPresent(String.self, forKey: .title) ?? ""
+        why = try c.decodeIfPresent(String.self, forKey: .why) ?? ""
+        due = try c.decodeIfPresent(Date.self, forKey: .due)
+        createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
+        archivedAt = try c.decodeIfPresent(Date.self, forKey: .archivedAt)
+    }
+
+    init(id: UUID = UUID(), title: String, why: String = "", due: Date? = nil,
+         createdAt: Date = Date(), archivedAt: Date? = nil) {
+        self.id = id; self.title = title; self.why = why
+        self.due = due; self.createdAt = createdAt; self.archivedAt = archivedAt
+    }
 }
 
 /// Une chose à faire. Peut être estimée, datée, faite, ou choisie pour un jour.
@@ -83,6 +102,30 @@ struct Item: Identifiable, Codable {
     var step: Int = 0
 
     var isOpen: Bool { doneAt == nil }
+
+    /// Même tolérance que `Project` : une clé absente ne doit jamais coûter
+    /// la totalité de la liste.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        title = try c.decodeIfPresent(String.self, forKey: .title) ?? ""
+        minutes = try c.decodeIfPresent(Int.self, forKey: .minutes)
+        due = try c.decodeIfPresent(Date.self, forKey: .due)
+        createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
+        doneAt = try c.decodeIfPresent(Date.self, forKey: .doneAt)
+        pickedOn = try c.decodeIfPresent(Date.self, forKey: .pickedOn)
+        deferrals = try c.decodeIfPresent(Int.self, forKey: .deferrals) ?? 0
+        projectID = try c.decodeIfPresent(UUID.self, forKey: .projectID)
+        step = try c.decodeIfPresent(Int.self, forKey: .step) ?? 0
+    }
+
+    init(id: UUID = UUID(), title: String, minutes: Int? = nil, due: Date? = nil,
+         createdAt: Date = Date(), doneAt: Date? = nil, pickedOn: Date? = nil,
+         deferrals: Int = 0, projectID: UUID? = nil, step: Int = 0) {
+        self.id = id; self.title = title; self.minutes = minutes; self.due = due
+        self.createdAt = createdAt; self.doneAt = doneAt; self.pickedOn = pickedOn
+        self.deferrals = deferrals; self.projectID = projectID; self.step = step
+    }
 
     /// Choisie pour aujourd'hui et pas encore faite.
     var isPickedToday: Bool {

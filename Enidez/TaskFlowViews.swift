@@ -253,9 +253,18 @@ struct HyperfocusView: View {
     private let total = 15 * 60
     @State private var remaining = 15 * 60
     @State private var running = true
+    /// La pause : on ne coupe pas l'élan, on l'accompagne quand il s'essouffle.
+    @State private var onBreak = false
+    /// Combien de pensées existaient au départ : les suivantes sont de ce focus.
+    @State private var thoughtsAtStart = 0
 
     private var timeString: String {
         String(format: "%d:%02d", remaining / 60, remaining % 60)
+    }
+
+    /// Ce qui a été confié pendant ce focus — à trier pendant la pause.
+    private var thoughtsThisSession: [String] {
+        Array(model.capturedThoughts.dropFirst(thoughtsAtStart))
     }
 
     var body: some View {
@@ -307,10 +316,37 @@ struct HyperfocusView: View {
                 .padding(.bottom, 28)
             }
         }
+        .overlay {
+            if onBreak {
+                BreakView(
+                    task: model.currentPick,
+                    project: model.currentPick?.projectID.flatMap { id in
+                        model.projects.first { $0.id == id }
+                    },
+                    thoughts: thoughtsThisSession,
+                    onResume: { minutes in
+                        remaining = minutes * 60
+                        running = true
+                        onBreak = false
+                    },
+                    onDone: { model.completeCurrentPick() },
+                    onStop: { model.inFocus = false },
+                    onKeep: { thought in model.capture(thought) }
+                )
+                .transition(.opacity)
+            }
+        }
+        .onAppear { thoughtsAtStart = model.capturedThoughts.count }
         .task(id: running) {
             while running && remaining > 0 {
                 try? await Task.sleep(for: .seconds(1))
                 if running { remaining -= 1 }
+            }
+            // Le temps est écoulé : on ne coupe pas sèchement, on propose
+            // la pause. C'est là que le corps et la tête se rattrapent.
+            if remaining <= 0 && !onBreak {
+                running = false
+                withAnimation(.easeInOut(duration: 0.3)) { onBreak = true }
             }
         }
     }
